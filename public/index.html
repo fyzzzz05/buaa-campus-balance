@@ -91,6 +91,7 @@ input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-co
   </div>
 
   <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:18px"><input id="network-same" type="checkbox" style="width:auto">校园网使用相同密码</label>
+  <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:18px"><input id="auto-login" type="checkbox" style="width:auto">保存密码到本机钥匙串，自动重新登录</label>
 
   <button class="go" id="go" type="button">登录</button>
   <p class="msg" id="msg" role="status" aria-live="polite"></p>
@@ -115,7 +116,7 @@ async function submit() {
   }
   go.disabled = true; go.textContent = '登录中…'; msg.className = 'msg info'; msg.textContent = '';
   try {
-    const response = await fetch('/api/auth', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value.trim(),password:pwd.value,networkSamePassword:document.getElementById('network-same').checked})});
+    const response = await fetch('/api/auth', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value.trim(),password:pwd.value,networkSamePassword:document.getElementById('network-same').checked,autoLogin:document.getElementById('auto-login').checked})});
     const result = await response.json();
     pwd.value = '';
     if (!response.ok) {msg.className='msg err';msg.textContent=result.error || '登录失败，请重试。';return;}

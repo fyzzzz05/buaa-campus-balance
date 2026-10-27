@@ -1,5 +1,6 @@
 const campus = require('../lib/campus');
 const session = require('../lib/session');
+const credentials = require('../lib/credentials');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -10,12 +11,23 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({error:'不支持此请求'});
   const origin = req.headers.origin;
   if (origin && new URL(origin).host !== req.headers.host) return res.status(403).json({error:'请求来源不受支持'});
-  if (req.body?.action === 'logout') { session.clear(res); return res.status(200).json({ok:true}); }
+  if (req.body?.action === 'logout') {
+    const current=session.read(req);
+    if (current?.autoLogin === true) {
+      try { await credentials.remove(current.user); } catch { return res.status(503).json({error:'无法移除钥匙串中的密码，请先解锁钥匙串'}); }
+    }
+    session.clear(res); return res.status(200).json({ok:true});
+  }
   const user = String(req.body?.username || '').trim(), password = String(req.body?.password || '');
   if (!process.env.SESSION_SECRET || (!process.env.ALLOWED_USER_ID && process.env.CAMPUS_WEB !== '1' && process.env.CAMPUS_APP !== '1')) return res.status(503).json({error:'系统尚未配置登录'});
   if (!/^[A-Za-z0-9][A-Za-z0-9@._-]{1,64}$/.test(user) || (process.env.ALLOWED_USER_ID && user !== process.env.ALLOWED_USER_ID) || !password || password.length > 256) return res.status(401).json({error:'账号或密码不正确'});
   try {
     const current = await campus.login(user, password, req.body?.networkSamePassword === true);
+    if (req.body?.autoLogin === true) {
+      if (process.env.CAMPUS_WEB !== '1' && process.env.CAMPUS_APP !== '1') return res.status(400).json({error:'自动登录仅支持本机运行'});
+      try { await credentials.save(user,password); } catch { return res.status(503).json({error:'无法保存到钥匙串，请解锁钥匙串后重试'}); }
+      current.autoLogin=true;
+    }
     session.write(res, current);
     return res.status(200).json({ok:true});
   } catch (err) {

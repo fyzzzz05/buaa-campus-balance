@@ -19,6 +19,14 @@ test('a missing or incomplete cookie never creates a session', () => {
   assert.equal(session.read({headers:{cookie:'campus_session_count=2; campus_session_0=abc'}}),null);
 });
 
+test('automatic login extends only the local encrypted session',()=>{
+  let headers;const res={setHeader(k,v){if(k==='Set-Cookie')headers=v}};
+  session.write(res,{user:'20250001',jar:{cookies:[]},autoLogin:true});
+  assert(headers[0].includes('Max-Age=2592000'));
+  const decoded=session.unseal(session.seal({user:'20250001',autoLogin:true}));
+  assert(decoded.exp>Date.now()+29*24*60*60*1000);
+});
+
 test('network quotas are read from the actual table, not from labels elsewhere', () => {
   const html = '<table><thead><tr><th>已用流量</th><th>免费流量剩余</th><th>计费流量剩余</th></tr></thead><tbody><tr><td>35.774G</td><td>34.226G</td><td>40.000G</td></tr></tbody></table>';
   assert.deepEqual(campus.quota(html),{used:35.774,free:34.226,paid:40});
