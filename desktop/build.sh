@@ -16,6 +16,6 @@ cp "$(command -v node)" "$OUTPUT/Contents/Resources/node"
 chmod 755 "$OUTPUT/Contents/Resources/node"
 cp "$ROOT/dev.js" "$OUTPUT/Contents/Resources/app/"
 cp -R "$ROOT/api" "$ROOT/lib" "$ROOT/public" "$ROOT/node_modules" "$OUTPUT/Contents/Resources/app/"
-swiftc -O -F "$OUTPUT/Contents/Frameworks" -framework Sparkle -framework AppKit -framework WebKit -framework Security -Xlinker -rpath -Xlinker @executable_path/../Frameworks "$ROOT/desktop/main.swift" -o "$OUTPUT/Contents/MacOS/CampusBalance"
+swiftc -O -target arm64-apple-macosx13.5 -F "$OUTPUT/Contents/Frameworks" -framework Sparkle -framework AppKit -framework WebKit -framework Security -Xlinker -rpath -Xlinker @executable_path/../Frameworks "$ROOT/desktop/main.swift" -o "$OUTPUT/Contents/MacOS/CampusBalance"
 codesign --force --deep --sign - "$OUTPUT" >/dev/null
 echo "Built: $OUTPUT"

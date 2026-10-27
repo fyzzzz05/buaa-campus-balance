@@ -8,6 +8,7 @@
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
+  <key>LSMinimumSystemVersion</key><string>13.5</string>
   <key>SUFeedURL</key><string>https://github.com/fyzzzz05/buaa-campus-balance/releases/latest/download/appcast.xml</string>
   <key>SUPublicEDKey</key><string>OKchFlDeTFqdUmZIaui8iejfYqK9cgEoN9HgJPaPOfM=</string>
   <key>SUVerifyUpdateBeforeExtraction</key><true/>

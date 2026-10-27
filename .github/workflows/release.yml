@@ -43,7 +43,7 @@ jobs:
           SIZE=$(stat -f %z "$ARCHIVE")
           cat > "$RUNNER_TEMP/appcast.xml" <<EOF
           <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><title>校园余额更新</title><item><title>$VERSION</title><sparkle:version>$BUILD_VERSION</sparkle:version><sparkle:shortVersionString>$VERSION</sparkle:shortVersionString><enclosure url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/CampusBalance-macOS-arm64.zip" length="$SIZE" type="application/octet-stream" sparkle:edSignature="$SIGNATURE" /></item></channel></rss>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><title>校园余额更新</title><item><title>$VERSION</title><sparkle:version>$BUILD_VERSION</sparkle:version><sparkle:shortVersionString>$VERSION</sparkle:shortVersionString><sparkle:minimumSystemVersion>13.5</sparkle:minimumSystemVersion><enclosure url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/CampusBalance-macOS-arm64.zip" length="$SIZE" type="application/octet-stream" sparkle:edSignature="$SIGNATURE" /></item></channel></rss>
           EOF
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_DIR/bin/sign_update" --ed-key-file - "$RUNNER_TEMP/appcast.xml"
       - name: Publish release
