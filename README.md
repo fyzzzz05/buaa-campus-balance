@@ -27,3 +27,9 @@ npm ci
 - 校园卡和校园网数据来自学校服务。服务不可用、认证过期、额外验证或网络不通时需要重新处理。
 
 测试：`npm test`。
+
+## macOS 更新与发布
+
+App 左上角「校园余额 → 检查更新…」使用 Sparkle 检查 GitHub Releases。首次需要安装支持更新的版本；之后更新由应用提示并安装。更新包和更新描述均使用 Ed25519 签名，私钥保存在维护者的钥匙串及 GitHub Actions Secret 中。
+
+维护者推送形如 `v1.0.1` 的版本标签后，GitHub Actions 会测试、构建 Apple Silicon 版本、签名并发布 Release。应用由临时签名构建，未使用 Apple Developer ID 签名或 Apple 公证；其他 Mac 首次安装时可能出现系统验证提示。使用前请先在目标网络确认能够访问 GitHub。

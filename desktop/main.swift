@@ -1,6 +1,7 @@
 import AppKit
 import WebKit
 import Security
+import Sparkle
 
 final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var window: NSWindow!
@@ -8,8 +9,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var server: Process?
     private var pendingOutput = ""
     private var terminating = false
+    private var updaterController: SPUStandardUpdaterController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+        configureMenu()
         let rect = NSRect(x: 0, y: 0, width: 1050, height: 720)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "校园余额"
@@ -25,6 +29,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         do { try startServer() }
         catch { fail("无法启动校园余额，请重新打开应用。") }
+    }
+
+    private func configureMenu() {
+        let mainMenu = NSMenu()
+        let appItem = NSMenuItem()
+        mainMenu.addItem(appItem)
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "关于校园余额", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        let updateItem = NSMenuItem(title: "检查更新…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = updaterController
+        appMenu.addItem(updateItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "退出校园余额", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appItem.submenu = appMenu
+        NSApp.mainMenu = mainMenu
     }
 
     private func sessionSecret() throws -> String {
