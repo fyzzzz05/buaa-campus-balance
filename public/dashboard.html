@@ -37,6 +37,7 @@ h1{font-size:18px;font-weight:600;margin:0}
 .right span{font-size:13px;color:var(--muted)}
 .btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;display:inline-block;text-decoration:none}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn[hidden]{display:none}#reauth{margin-top:10px}
 .btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .board{display:grid;grid-template-columns:300px 1fr;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;min-height:440px}
@@ -136,7 +137,7 @@ dialog input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 <main class="board" id="board">
 <nav class="side" id="side" role="tablist" aria-orientation="vertical" aria-label="余额类别"><div class="pill" id="pill"></div><div class="hint">按 ↑ ↓ 键切换</div></nav>
 <section class="main" id="panel" role="tabpanel" tabindex="0">
- <div class="mhead"><div class="mtitle" id="mtitle"><h2 id="ttl"></h2><p id="sub"></p></div>
+ <div class="mhead"><div class="mtitle" id="mtitle"><h2 id="ttl"></h2><p id="sub"></p><a class="btn" id="reauth" href="/" hidden>重新登录</a></div>
  <div class="seg" id="seg" role="group" aria-label="图表类型"><span class="thumb"></span><button type="button" data-t="bar" aria-pressed="true">柱状</button><button type="button" data-t="line" aria-pressed="false">折线</button></div></div>
  <div class="chart" id="chart"><svg id="svg" role="img"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="s1"/><stop offset="1" class="s2"/></linearGradient></defs><g class="grid" id="grid"></g><g class="axis" id="axis"></g><g class="gb" id="gb"></g><g class="gl" id="gl"><g id="lines"></g><g id="dots"></g></g></svg><div class="tip" id="tip"></div><div class="empty-chart" id="empty" hidden></div></div>
  <div class="stats"><div class="stat"><div class="k" id="sum-label">合计</div><div class="n" id="s0"></div></div><div class="stat"><div class="k">日均</div><div class="n" id="s1"></div></div><div class="stat"><div class="k">单日最高</div><div class="n" id="s2"></div></div></div>
@@ -169,6 +170,7 @@ function renderPanel(){
  points=Array.isArray(a.history)&&a.history.length?a.history.slice(-14):fallbackDays();
  const valid=points.filter(p=>p.value!==null&&Number.isFinite(p.value)&&p.value>=0);
  $('sub').textContent=a.historyNote||a.note||'近 14 天';
+ $('reauth').hidden=a.status!=='login_required';
  $('empty').textContent=a.status==='loading'?'正在查询':a.status!=='ok'?(a.note||'暂时无法查询'):'暂无可展示的数据';$('empty').hidden=valid.length>0;
  const sum=valid.reduce((n,p)=>n+p.value,0);$('sum-label').textContent=valid.length===points.length?'14 天合计':'已记录合计';
  textStat('s0',valid.length?sum:null,g.unit);textStat('s1',valid.length?sum/valid.length:null,g.unit);textStat('s2',valid.length?Math.max(...valid.map(p=>p.value)):null,g.unit);
