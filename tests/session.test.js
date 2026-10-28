@@ -72,3 +72,30 @@ test('school login failures cannot issue a session', async (t) => {
   });
   await assert.rejects(campus.login('20250001','wrong-password'),/登录失败/);
 });
+
+test('school cookies must be validated by upstream before issuing a session', async t => {
+  let count=0;
+  t.mock.method(globalThis,'fetch',async (url,opts)=>{
+    count++;
+    assert(!String(opts.headers.cookie || '').includes('outside=secret'));
+    const payload = count===1 ? {success:true,data:{account:'20250001'}} : {success:true,data:[{stuNo:'20250001'}]};
+    return {status:200,headers:{get:()=>null,getSetCookie:()=>[]},text:async()=>JSON.stringify(payload)};
+  });
+  const result=await campus.loginWithSchoolCookies([{domain:'.cc-pay.cn',name:'sid',value:'school-session',path:'/'},{domain:'evil.example',name:'outside',value:'secret',path:'/'}]);
+  assert.equal(result.user,'20250001');
+  assert.equal(result.netDigest,null);
+  assert.equal(count,2);
+});
+
+test('native school-session endpoint rejects web and unauthenticated callers', async t => {
+  const auth=require('../api/auth');
+  const previous=process.env.CAMPUS_APP;
+  process.env.CAMPUS_APP='1';
+  t.after(()=>{if(previous===undefined)delete process.env.CAMPUS_APP;else process.env.CAMPUS_APP=previous});
+  let status=0;
+  const res={setHeader(){},status(code){status=code;return this},json(){}};
+  await auth({method:'POST',headers:{},body:{action:'school-session',cookies:[]}},res);
+  assert.equal(status,403);
+  await auth({method:'POST',headers:{origin:'http://127.0.0.1', 'x-campus-native-token':process.env.SESSION_SECRET},body:{action:'school-session',cookies:[]}},res);
+  assert.equal(status,403);
+});

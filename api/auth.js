@@ -9,6 +9,18 @@ module.exports = async function handler(req, res) {
     return res.status(current ? 200 : 401).json(current ? {authenticated:true} : {authenticated:false});
   }
   if (req.method !== 'POST') return res.status(405).json({error:'不支持此请求'});
+  if (req.body?.action === 'school-session') {
+    // Only the native app knows this per-launch secret; the web page never sees it.
+    const crypto = require('node:crypto');
+    const supplied = Buffer.from(String(req.headers['x-campus-native-token'] || ''));
+    const expected = Buffer.from(String(process.env.SESSION_SECRET || ''));
+    if (process.env.CAMPUS_APP !== '1' || expected.length < 32 || supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected) || req.headers.origin) return res.status(403).json({error:'请求来源不受支持'});
+    try {
+      const current = await campus.loginWithSchoolCookies(req.body.cookies);
+      session.write(res, current);
+      return res.status(200).json({ok:true});
+    } catch { return res.status(401).json({error:'学校登录尚未完成'}); }
+  }
   const origin = req.headers.origin;
   if (origin && new URL(origin).host !== req.headers.host) return res.status(403).json({error:'请求来源不受支持'});
   if (req.body?.action === 'logout') {

@@ -10,6 +10,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var pendingOutput = ""
     private var terminating = false
     private var updaterController: SPUStandardUpdaterController!
+    private var localURL: URL!
+    private var nativeToken = ""
+    private var schoolLogin = false
+    private var completingSchoolLogin = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
@@ -21,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window.center()
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
+        config.userContentController.addUserScript(WKUserScript(source: "if (location.hostname === '127.0.0.1') window.__campusNative = true;", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         web = WKWebView(frame: window.contentView!.bounds, configuration: config)
         web.navigationDelegate = self
         web.autoresizingMask = [.width, .height]
@@ -67,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         environment["PORT"] = "0"
         environment.removeValue(forKey: "SESSION_SECRET")
         let secret = try sessionSecret()
+        nativeToken = secret
         process.environment = environment
         process.standardOutput = output
         process.standardInput = input
@@ -91,14 +97,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
               let port = Int(line.dropFirst(6)), (1...65535).contains(port),
               let url = URL(string: "http://127.0.0.1:\(port)/") else { return }
         handle.readabilityHandler = nil
+        localURL = url
         web.load(URLRequest(url: url))
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
         guard let url = navigationAction.request.url else { decisionHandler(.cancel); return }
-        if url.host == "127.0.0.1" || url.scheme == "about" { decisionHandler(.allow) }
+        if url.host == "127.0.0.1", url.path == "/sso/start" {
+            schoolLogin = true
+            decisionHandler(.cancel)
+            web.load(URLRequest(url: URL(string: "https://www.cc-pay.cn/login?channel=BUAASSO")!))
+        }
+        else if schoolLogin && url.scheme == "https" && ["www.cc-pay.cn", "pass.cc-pay.cn", "mall.cc-pay.cn", "sso.buaa.edu.cn"].contains(url.host ?? "") { decisionHandler(.allow) }
+        else if url.host == "127.0.0.1" || url.scheme == "about" { decisionHandler(.allow) }
         else { decisionHandler(.cancel); NSWorkspace.shared.open(url) }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard schoolLogin, !completingSchoolLogin, ["www.cc-pay.cn", "pass.cc-pay.cn", "mall.cc-pay.cn"].contains(webView.url?.host ?? "") else { return }
+        completingSchoolLogin = true
+        let attemptedURL = webView.url
+        webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
+            guard let self else { return }
+            let allowed = Set(["cc-pay.cn", "www.cc-pay.cn", "pass.cc-pay.cn", "mall.cc-pay.cn", "sso.buaa.edu.cn"])
+            let values: [[String: String]] = cookies.filter { allowed.contains($0.domain.trimmingCharacters(in: CharacterSet(charactersIn: ".")).lowercased()) }.map { ["name": $0.name, "value": $0.value, "domain": $0.domain, "path": $0.path] }
+            guard let body = try? JSONSerialization.data(withJSONObject: ["action": "school-session", "cookies": values]), let url = URL(string: "/api/auth", relativeTo: self.localURL) else { self.completingSchoolLogin = false; return }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue(self.nativeToken, forHTTPHeaderField: "X-Campus-Native-Token")
+            request.httpBody = body
+            let config = URLSessionConfiguration.ephemeral
+            let session = URLSession(configuration: config)
+            session.dataTask(with: request) { [weak self] _, response, _ in
+                guard let self else { return }
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                    DispatchQueue.main.async {
+                        self.completingSchoolLogin = false
+                        if webView.url != attemptedURL { self.webView(webView, didFinish: nil) }
+                    }
+                    return
+                }
+                let localCookies = config.httpCookieStorage?.cookies(for: self.localURL) ?? []
+                let group = DispatchGroup()
+                for cookie in localCookies { group.enter(); webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie) { group.leave() } }
+                group.notify(queue: .main) {
+                    self.schoolLogin = false
+                    self.completingSchoolLogin = false
+                    webView.load(URLRequest(url: self.localURL.appendingPathComponent("dashboard")))
+                }
+            }.resume()
+        }
     }
 
     private func fail(_ message: String) {
