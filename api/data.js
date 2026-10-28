@@ -3,6 +3,7 @@ const session = require('../lib/session');
 const cardHistory = require('../lib/card-history');
 const settings = require('../lib/settings');
 const credentials = require('../lib/credentials');
+const widgetSnapshot = require('../lib/widget-snapshot');
 
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
@@ -25,6 +26,8 @@ module.exports = async function handler(req, res) {
   } catch { data.card = {status:'unavailable',note:'饭卡查询暂不可用'}; }
   try { data.net = await campus.network(current); } catch { data.net = {status:'unavailable',note:'校园网查询暂不可用'}; }
   try { Object.assign(data, await campus.electricity(settings.read(current.user))); } catch { data.lighting = data.air = {status:'unavailable',note:'电费查询暂不可用'}; }
+  if (current.widgetWarning) data.widgetWarning=current.widgetWarning;
+  try { await widgetSnapshot.publish(data); } catch { data.widgetWarning='小组件数据共享暂不可用'; }
   try { session.write(res, current); } catch { return res.status(503).json({error:'登录状态暂不可用'}); }
   return res.status(200).json({data});
 };

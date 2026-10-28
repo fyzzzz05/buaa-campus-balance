@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var nativeToken = ""
     private var schoolLogin = false
     private var completingSchoolLogin = false
+    private var pendingMetric: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
@@ -69,6 +70,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         environment["NODE_ENV"] = "local"
         environment["CAMPUS_APP"] = "1"
         environment["CAMPUS_PARENT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+        let widgetHelper = resources.appendingPathComponent("CampusWidgetSnapshot")
+        let widgetWorker = resources.appendingPathComponent("app/widget-refresh.js")
+        if FileManager.default.fileExists(atPath: widgetHelper.path), FileManager.default.fileExists(atPath: widgetWorker.path) {
+            environment["CAMPUS_WIDGET_HELPER"] = widgetHelper.path
+            environment["CAMPUS_WIDGET_REFRESH"] = widgetWorker.path
+            environment["CAMPUS_WIDGET_NODE"] = resources.appendingPathComponent("node").path
+            environment["CAMPUS_WIDGET_BRIDGE"] = resources.appendingPathComponent("app/widget-bridge.js").path
+            environment["CAMPUS_WIDGET_TOKEN_FILE"] = resources.appendingPathComponent("widget-token").path
+        }
         environment["PORT"] = "0"
         environment.removeValue(forKey: "SESSION_SECRET")
         let secret = try sessionSecret()
@@ -98,7 +108,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
               let url = URL(string: "http://127.0.0.1:\(port)/") else { return }
         handle.readabilityHandler = nil
         localURL = url
-        web.load(URLRequest(url: url))
+        if let metric = pendingMetric { pendingMetric = nil; openDashboard(metric) }
+        else { web.load(URLRequest(url: url)) }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first(where: { $0.scheme == "campusbalance" && $0.host == "dashboard" }),
+              let value = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "item" })?.value,
+              ["card", "network", "lighting", "air"].contains(value) else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+        if localURL == nil || schoolLogin { pendingMetric = value } else { openDashboard(value) }
+    }
+
+    private func openDashboard(_ metric: String) {
+        guard let url=localURL?.appendingPathComponent("dashboard"), var components=URLComponents(url:url,resolvingAgainstBaseURL:false) else { pendingMetric=metric; return }
+        components.queryItems=[URLQueryItem(name:"item",value:metric)]
+        if let target=components.url { web.load(URLRequest(url:target)) }
     }
 
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
@@ -145,7 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
                 group.notify(queue: .main) {
                     self.schoolLogin = false
                     self.completingSchoolLogin = false
-                    webView.load(URLRequest(url: self.localURL.appendingPathComponent("dashboard")))
+                    if let metric = self.pendingMetric { self.pendingMetric = nil; self.openDashboard(metric) }
+                    else { webView.load(URLRequest(url: self.localURL.appendingPathComponent("dashboard"))) }
                 }
             }.resume()
         }

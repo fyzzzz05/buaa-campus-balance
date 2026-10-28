@@ -214,7 +214,9 @@ $('dorm-open').addEventListener('click',async()=>{try{const r=await fetch('/api/
 $('dorm-cancel').addEventListener('click',()=>$('dorm-dialog').close());
 $('dorm-form').addEventListener('submit',async e=>{e.preventDefault();$('settings-error').textContent='';try{const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dorm:$('dorm-name').value,lighting:$('meter-lighting').value,air:$('meter-air').value,historyOwner:$('history-owner').value})});if(!r.ok)throw new Error();meterIndicator((await r.json()).settings);$('dorm-dialog').close();await refresh()}catch{$('settings-error').textContent='保存失败，请检查填写的信息'}});
 new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{movePill();drawChart()})}).observe(board);
-updateItems();select(0,false);requestAnimationFrame(()=>requestAnimationFrame(()=>board.classList.add('ready')));if(document.fonts?.ready)document.fonts.ready.then(movePill);
-async function refresh(){try{const response=await fetch('/api/data',{cache:'no-store'});if(response.status===401){location.replace('/');return}if(!response.ok)throw new Error('fetch');data=(await response.json()).data;const now=new Date();$('stamp').textContent='更新于 '+(now.getMonth()+1)+' 月 '+now.getDate()+' 日';}catch{data=Object.fromEntries(groups.map(g=>[g.key,{status:'unavailable',note:'暂时无法查询'}]));$('stamp').textContent='查询失败'}updateItems();select(sel,false)}
+const requestedMetric=new URLSearchParams(location.search).get('item');
+const initialIndex=groups.findIndex(g=>g.key===(requestedMetric==='network'?'net':requestedMetric));
+updateItems();select(initialIndex<0?0:initialIndex,false);requestAnimationFrame(()=>requestAnimationFrame(()=>board.classList.add('ready')));if(document.fonts?.ready)document.fonts.ready.then(movePill);
+async function refresh(){try{const response=await fetch('/api/data',{cache:'no-store'});if(response.status===401){location.replace('/');return}if(!response.ok)throw new Error('fetch');data=(await response.json()).data;const now=new Date();$('stamp').textContent=data.widgetWarning||('更新于 '+(now.getMonth()+1)+' 月 '+now.getDate()+' 日');}catch{data=Object.fromEntries(groups.map(g=>[g.key,{status:'unavailable',note:'暂时无法查询'}]));$('stamp').textContent='查询失败'}updateItems();select(sel,false)}
 loadMeterIndicator();refresh();
 </script></body></html>
