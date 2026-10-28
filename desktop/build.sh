@@ -1,8 +1,8 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-OUTPUT=${1:-"$ROOT/../校园余额.app"}
-VERSION=${APP_VERSION:-1.0.0}
+VERSION=${APP_VERSION:-$(cat "$ROOT/VERSION")}
+OUTPUT=${1:-"$ROOT/../校园余额-v$VERSION.app"}
 if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'; then echo 'Invalid APP_VERSION' >&2; exit 1; fi
 BUILD_VERSION=$(printf '%s' "$VERSION" | awk -F. '{print ($1 * 1000000) + ($2 * 1000) + $3}')
 SPARKLE_DIR=$(sh "$ROOT/desktop/prepare-sparkle.sh")

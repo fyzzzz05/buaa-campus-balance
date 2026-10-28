@@ -1,7 +1,9 @@
 #!/bin/sh
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
-OUTPUT=${1:-"$ROOT/../校园余额-组件测试.app"}
+APP_VERSION=${APP_VERSION:-$(cat "$ROOT/VERSION")}
+export APP_VERSION
+OUTPUT=${1:-"$ROOT/../校园余额-v$APP_VERSION.app"}
 DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 export DEVELOPER_DIR
 if [ ! -x "$DEVELOPER_DIR/usr/bin/xcodebuild" ]; then echo '需要安装完整版 Xcode。' >&2; exit 1; fi
