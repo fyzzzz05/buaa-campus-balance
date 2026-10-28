@@ -29,6 +29,10 @@ jobs:
           codesign --verify --deep --strict "$RUNNER_TEMP/校园余额-v$VERSION.app"
           test -d "$RUNNER_TEMP/校园余额-v$VERSION.app/Contents/PlugIns/CampusBalanceWidget.appex/Contents/Resources/Metadata.appintents"
           ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/校园余额-v$VERSION.app" "$RUNNER_TEMP/CampusBalance-macOS-arm64.zip"
+          mkdir "$RUNNER_TEMP/dmg-content"
+          cp -R "$RUNNER_TEMP/校园余额-v$VERSION.app" "$RUNNER_TEMP/dmg-content/"
+          ln -s /Applications "$RUNNER_TEMP/dmg-content/Applications"
+          hdiutil create -volname "校园余额 v$VERSION" -srcfolder "$RUNNER_TEMP/dmg-content" -format UDZO "$RUNNER_TEMP/CampusBalance-v$VERSION-macOS-arm64.dmg"
       - name: Sign update and feed
         shell: bash
         env:
@@ -54,5 +58,5 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --notes "macOS Apple Silicon 版本，包含校园余额桌面小组件（macOS 14 或更新版本）。未使用 Apple Developer ID 签名与公证。"
-          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-macOS-arm64.zip" "$RUNNER_TEMP/appcast.xml"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-macOS-arm64.zip" "$RUNNER_TEMP/appcast.xml" "$RUNNER_TEMP/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

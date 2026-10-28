@@ -23,7 +23,7 @@
 
 ## 安装与使用
 
-1. 从 [Releases](https://github.com/fyzzzz05/buaa-campus-balance/releases/latest) 下载 `CampusBalance-macOS-arm64.zip`，解压并打开「校园余额」。需要 Apple 芯片 Mac 和 macOS 13.5 或更新版本。
+1. 从 [Releases](https://github.com/fyzzzz05/buaa-campus-balance/releases/latest) 下载 `CampusBalance-v版本号-macOS-arm64.dmg`，打开后将应用拖入「应用程序」。需要 Apple 芯片 Mac 和 macOS 13.5 或更新版本。
 2. 在能够访问学校服务的网络中登录。可以在应用内填写统一身份认证账号和密码，或者选择「打开学校统一认证」到学校页面登录。
 3. 点击右上角「电表号」，填写自己的照明和空调电表号。电表号可通过北航总务公众号查询；目前不能仅凭楼栋和房间自动查找。
 
