@@ -4,7 +4,14 @@
 
 [下载 macOS 版](https://github.com/fyzzzz05/buaa-campus-balance/releases/latest) · [查看更新记录](https://github.com/fyzzzz05/buaa-campus-balance/releases)
 
+![校园余额使用界面](docs/images/dashboard.png)
+
+<details>
+<summary>查看登录界面</summary>
+
 ![校园余额登录界面](docs/images/login.png)
+
+</details>
 
 ## 功能
 
