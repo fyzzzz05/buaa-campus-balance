@@ -8,6 +8,9 @@ struct DormSettings: Codable, Equatable {
     var air: String = ""
     var historyOwner: String = ""
 
+    func normalized() -> DormSettings {
+        DormSettings(dorm:dorm.trimmingCharacters(in:.whitespacesAndNewlines),lighting:lighting.trimmingCharacters(in:.whitespacesAndNewlines),air:air.trimmingCharacters(in:.whitespacesAndNewlines),historyOwner:historyOwner.trimmingCharacters(in:.whitespacesAndNewlines))
+    }
     func validate() throws {
         guard dorm.count <= 60, dorm.unicodeScalars.allSatisfy({ $0.value >= 32 }),
               lighting.range(of: #"^(?:\d{1,30})?$"#, options: .regularExpression) != nil,
@@ -23,15 +26,19 @@ enum LocalSettings {
     }
     static func read(user: String, home: URL = FileManager.default.homeDirectoryForCurrentUser) -> DormSettings {
         guard let data = try? Data(contentsOf: file(user: user, home: home)),
-              let value = try? JSONDecoder().decode(DormSettings.self, from: data), (try? value.validate()) != nil else { return DormSettings() }
+              let parsed = try? JSONDecoder().decode(DormSettings.self, from: data) else { return DormSettings() }
+        let value = parsed.normalized()
+        guard (try? value.validate()) != nil else { return DormSettings() }
         return value
     }
-    static func write(user: String, value: DormSettings, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws {
+    static func write(user: String, value: DormSettings, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> DormSettings {
+        let value = value.normalized()
         try value.validate()
         let target = file(user: user, home: home)
         try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try JSONEncoder().encode(value).write(to: target, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
+        return value
     }
 }
 

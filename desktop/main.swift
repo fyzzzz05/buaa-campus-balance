@@ -62,8 +62,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private func startServer() throws {
         guard let resources = Bundle.main.resourceURL else { throw NSError(domain: "Campus", code: 1) }
         let process = Process(), output = Pipe(), input = Pipe()
-        process.executableURL = resources.appendingPathComponent("node")
-        process.arguments = [resources.appendingPathComponent("app/dev.js").path]
+        process.executableURL = resources.appendingPathComponent("CampusServer")
+        process.arguments = [resources.path]
         process.currentDirectoryURL = resources.appendingPathComponent("app")
         var environment = ProcessInfo.processInfo.environment
         environment.removeValue(forKey: "VERCEL")
@@ -71,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         environment["CAMPUS_APP"] = "1"
         environment["CAMPUS_PARENT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
         let widgetHelper = resources.appendingPathComponent("CampusWidgetSnapshot")
-        let widgetWorker = resources.appendingPathComponent("app/widget-refresh.js")
+        let widgetWorker = resources.appendingPathComponent("CampusWidgetRefresh")
         if FileManager.default.fileExists(atPath: widgetHelper.path), FileManager.default.fileExists(atPath: widgetWorker.path) {
             environment["CAMPUS_WIDGET_HELPER"] = widgetHelper.path
             environment["CAMPUS_WIDGET_REFRESH"] = widgetWorker.path

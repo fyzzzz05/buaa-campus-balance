@@ -1,6 +1,6 @@
 # 校园余额
 
-在 Mac 上查看北航校园卡、校园网流量和宿舍电费。一个面板，了解余额和近期使用情况。
+在 Mac 上查看北航校园卡、校园网流量和宿舍电费。一个面板，了解余额和近期使用情况。macOS 应用使用 Swift 实现，不内置 Node.js 运行时。
 
 [下载 macOS 版](https://github.com/fyzzzz05/buaa-campus-balance/releases/latest) · [查看更新记录](https://github.com/fyzzzz05/buaa-campus-balance/releases)
 
@@ -61,7 +61,13 @@ macOS 14 及以上可添加小号「校园余额」组件，点击底部图标�
 
 ## 本地开发
 
-需要 Node.js 22 或更新版本，以及可以访问学校服务的网络。
+macOS 应用需要完整版 Xcode 和可以访问学校服务的网络。运行原生测试：
+
+```sh
+./tests/run-native.sh
+```
+
+仓库仍保留网页开发模式；运行网页模式和现有 JavaScript 测试需要 Node.js 22 或更新版本：
 
 ```sh
 npm ci

@@ -56,6 +56,7 @@ check(electricity["air"]?.history.last?.value == 0.3, "electricity daily usage")
 let differentMeter = try Electricity.history(csv, config: ElectricityConfig(lighting:"999", air:"456", historyOwner:"example"))
 check(differentMeter["lighting"] == nil && differentMeter["air"] != nil, "meter matching")
 check((try Electricity.csv("a,b\n\"x,y\",\"a\"\"b\""))[1] == ["x,y", "a\"b"], "CSV quoting")
+check((try Electricity.csv("a,b\r\nx,y\r\n")).count == 2, "CSV CRLF line endings")
 print("Native electricity history tests passed")
 let meterHTML = "<p>购电表号:123</p><p>地址:某楼[照明]</p><p>电价:0.5</p><p>截止 2026/10/27</p><svg id='canvas1'><text><tspan>20</tspan></text></svg>"
 check((try Electricity.meter(meterHTML, id:"123", kind:"lighting")).value == 10, "live meter balance")
@@ -65,7 +66,7 @@ let tempHome = FileManager.default.temporaryDirectory.appendingPathComponent(UUI
 try FileManager.default.createDirectory(at:tempHome,withIntermediateDirectories:true)
 defer { try? FileManager.default.removeItem(at:tempHome) }
 let settings = DormSettings(dorm:"某楼", lighting:"123", air:"456", historyOwner:"example")
-try LocalSettings.write(user:"testuser", value:settings, home:tempHome)
+_ = try LocalSettings.write(user:"testuser", value:settings, home:tempHome)
 check(LocalSettings.read(user:"testuser",home:tempHome) == settings, "settings round trip")
 check(LocalSettings.read(user:"other",home:tempHome) != settings, "account isolation")
 do { try DormSettings(dorm:"", lighting:"../../bad", air:"", historyOwner:"").validate(); fatalError("invalid meter accepted") } catch {}

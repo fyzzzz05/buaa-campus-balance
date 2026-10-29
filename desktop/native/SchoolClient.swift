@@ -51,7 +51,28 @@ final class NativeSchoolClient {
         return NativeSchoolSession(user: user, networkDigest: digest)
     }
 
-    func cardBalance(_ current: NativeSchoolSession) async throws -> Double {
+    #if CAMPUS_TESTING
+    func exportSchoolCookies() -> [[String:String]] { http.exportSchoolCookies() }
+    #endif
+    func loginWithCookies(_ cookies: [[String:String]]) async throws -> NativeSchoolSession {
+        try http.importSchoolCookies(cookies)
+        func account() async throws -> [String:Any] { try await json(makeURL("https://www.cc-pay.cn/api/user")) }
+        var profile = try await account()
+        if profile["success"] as? Bool != true {
+            _ = try await http.request(URLRequest(url:makeURL("https://www.cc-pay.cn/login",query:[URLQueryItem(name:"channel",value:"BUAASSO")])))
+            profile = try await account()
+        }
+        guard profile["success"] as? Bool == true, let data = profile["data"] as? [String:Any] else { throw NativeSchoolError.loginFailed }
+        let cards = try await json(makeURL("https://www.cc-pay.cn/api/campus_cards"))
+        guard cards["success"] as? Bool == true else { throw NativeSchoolError.loginFailed }
+        let nested = cards["data"] as? [String:Any]
+        let list = (cards["data"] as? [[String:Any]]) ?? (nested?["data"] as? [[String:Any]]) ?? (nested?["list"] as? [[String:Any]]) ?? (nested?["records"] as? [[String:Any]]) ?? []
+        let value = list.first?["stuNo"] ?? data["stuNo"] ?? data["userName"] ?? data["username"] ?? data["account"]
+        guard let user = value.map({"\($0)"}), user.range(of:#"^[A-Za-z0-9][A-Za-z0-9@._-]{1,64}$"#,options:.regularExpression) != nil else { throw NativeSchoolError.invalidResponse }
+        return NativeSchoolSession(user:user,networkDigest:nil)
+    }
+
+    func cardBalanceAndNumber(_ current: NativeSchoolSession) async throws -> (value: Double, number: String) {
         var cards = try await json(makeURL("https://www.cc-pay.cn/api/campus_cards"))
         if cards["success"] as? Bool != true {
             _ = try await http.request(URLRequest(url: makeURL("https://www.cc-pay.cn/login", query: [URLQueryItem(name: "channel", value: "BUAASSO")])))
@@ -64,7 +85,11 @@ final class NativeSchoolClient {
         let payload = try await json(makeURL("https://www.cc-pay.cn/api/campus_card/balance", query: [URLQueryItem(name: "stuNo", value: number)]))
         guard payload["success"] as? Bool == true, let item = payload["data"] as? [String: Any], let raw = item["balance"], !(raw is NSNull),
               let value = Double("\(raw)"), value.isFinite else { throw NativeSchoolError.unavailable }
-        return value
+        return (value, number)
+    }
+
+    func cardBalance(_ current: NativeSchoolSession) async throws -> Double {
+        try await cardBalanceAndNumber(current).value
     }
 
     func networkBalance(_ current: NativeSchoolSession) async throws -> NetworkQuota {

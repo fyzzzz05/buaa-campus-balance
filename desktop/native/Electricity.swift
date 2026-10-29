@@ -25,7 +25,7 @@ enum Electricity {
                     else { quoted = false; afterQuote = true }
                 } else { cell.append(c) }
             } else if c == "," { row.append(cell); cell = ""; afterQuote = false }
-            else if c == "\n" || c == "\r" {
+            else if c == "\n" || c == "\r" || c == "\r\n" {
                 if c == "\r" && i + 1 < chars.count && chars[i + 1] == "\n" { i += 1 }
                 row.append(cell); if row.contains(where: { !$0.isEmpty }) { rows.append(row) }
                 row = []; cell = ""; afterQuote = false
