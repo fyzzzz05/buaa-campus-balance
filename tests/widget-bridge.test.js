@@ -7,7 +7,9 @@ test('widget bridge serves only authenticated local snapshot',async t=>{
  fs.writeFileSync(path.join(folder,'widget-snapshot.json'),JSON.stringify({card:{value:12}}));
  const tokenFile=path.join(dir,'token');fs.writeFileSync(tokenFile,token);
  const reserve=net.createServer();await new Promise(r=>reserve.listen(0,'127.0.0.1',r));const port=reserve.address().port;await new Promise(r=>reserve.close(r));
- const child=spawn(process.execPath,[path.join(__dirname,'../widget-bridge.js'),tokenFile],{env:{...process.env,HOME:dir,CAMPUS_WIDGET_BRIDGE_PORT:String(port)},stdio:'ignore'});
+ const executable=process.env.CAMPUS_NATIVE_BRIDGE || process.execPath;
+ const args=process.env.CAMPUS_NATIVE_BRIDGE ? [tokenFile] : [path.join(__dirname,'../widget-bridge.js'),tokenFile];
+ const child=spawn(executable,args,{env:{...process.env,HOME:dir,CAMPUS_WIDGET_BRIDGE_PORT:String(port)},stdio:'ignore'});
  t.after(()=>{child.kill();fs.rmSync(dir,{recursive:true,force:true})});
  let response;for(let i=0;i<30;i++){try{response=await fetch(`http://127.0.0.1:${port}/snapshot`);break}catch{await new Promise(r=>setTimeout(r,20))}}
  assert(response);assert.equal(response.status,404);

@@ -16,7 +16,9 @@ if [ ! -d "$WIDGET/Contents/Resources/Metadata.appintents" ]; then echo '组件�
 "$ROOT/desktop/build.sh" "$OUTPUT"
 mkdir -p "$OUTPUT/Contents/PlugIns"
 cp -R "$WIDGET" "$OUTPUT/Contents/PlugIns/"
-cp "$ROOT/widget-refresh.js" "$ROOT/widget-bridge.js" "$OUTPUT/Contents/Resources/app/"
+cp "$ROOT/widget-refresh.js" "$OUTPUT/Contents/Resources/app/"
+xcrun swiftc -parse-as-library -O -target arm64-apple-macosx13.5 "$ROOT/desktop/native/WidgetBridge.swift" -o "$OUTPUT/Contents/Resources/CampusWidgetBridge"
+codesign --force --sign - "$OUTPUT/Contents/Resources/CampusWidgetBridge"
 TOKEN=$(openssl rand -hex 32)
 printf '%s' "$TOKEN" > "$OUTPUT/Contents/Resources/widget-token"
 chmod 600 "$OUTPUT/Contents/Resources/widget-token"

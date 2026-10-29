@@ -76,7 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
             environment["CAMPUS_WIDGET_HELPER"] = widgetHelper.path
             environment["CAMPUS_WIDGET_REFRESH"] = widgetWorker.path
             environment["CAMPUS_WIDGET_NODE"] = resources.appendingPathComponent("node").path
-            environment["CAMPUS_WIDGET_BRIDGE"] = resources.appendingPathComponent("app/widget-bridge.js").path
+            environment["CAMPUS_WIDGET_BRIDGE"] = resources.appendingPathComponent("CampusWidgetBridge").path
             environment["CAMPUS_WIDGET_TOKEN_FILE"] = resources.appendingPathComponent("widget-token").path
         }
         environment["PORT"] = "0"
