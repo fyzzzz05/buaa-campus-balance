@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 
 struct NativeSchoolSession {
     let user: String
@@ -29,9 +30,12 @@ final class NativeSchoolClient {
     func login(user: String, password: String, networkSamePassword: Bool) async throws -> NativeSchoolSession {
         guard user.range(of: #"^[A-Za-z0-9][A-Za-z0-9@._-]{1,64}$"#, options: .regularExpression) != nil,
               !password.isEmpty, password.utf8.count <= 1024 else { throw NativeSchoolError.loginFailed }
+        let log = Logger(subsystem:"edu.buaa.campusbalance",category:"performance")
+        let overallStart = Date()
         let start = try makeURL("https://www.cc-pay.cn/login", query: [URLQueryItem(name: "channel", value: "BUAASSO")])
         let (data, response) = try await http.request(URLRequest(url: start))
         guard response.statusCode == 200, let url = response.url, let html = String(data: data, encoding: .utf8) else { throw NativeSchoolError.unavailable }
+        log.info("login form request ms=\(Int(Date().timeIntervalSince(overallStart)*1000), privacy: .public)")
         let form = try SchoolHTML.loginForm(html, at: url)
         var fields = form.fields
         fields["username"] = user; fields["password"] = password; fields["submit"] = "LOGIN"
@@ -44,8 +48,12 @@ final class NativeSchoolClient {
         login.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         login.setValue("https://sso.buaa.edu.cn", forHTTPHeaderField: "Origin")
         login.setValue(url.absoluteString, forHTTPHeaderField: "Referer")
+        let submitStart = Date()
         _ = try await http.request(login)
+        log.info("login submission ms=\(Int(Date().timeIntervalSince(submitStart)*1000), privacy: .public)")
+        let accountStart = Date()
         let account = try await json(makeURL("https://www.cc-pay.cn/api/user"))
+        log.info("login account verification ms=\(Int(Date().timeIntervalSince(accountStart)*1000), privacy: .public)")
         guard account["success"] as? Bool == true, account["data"] is [String: Any] else { throw NativeSchoolError.loginFailed }
         let digest = networkSamePassword ? Insecure.MD5.hash(data: Data(password.utf8)).map { String(format: "%02x", $0) }.joined() : nil
         return NativeSchoolSession(user: user, networkDigest: digest)

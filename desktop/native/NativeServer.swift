@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Security
+import os
 
 enum LocalSetupError: Error { case widgetAgent, widgetReset, keychain }
 
@@ -30,6 +31,9 @@ actor LocalBackend {
     private var autoLogin = false
     private var widgetWarning:String?
     private var port:UInt16 = 0
+    private var generation = UUID()
+    private var batches = RefreshBatches()
+    private let performance = Logger(subsystem:"edu.buaa.campusbalance",category:"performance")
 
     init(resources:URL,nativeToken:String,sessionToken:String) { self.resources=resources;self.nativeToken=nativeToken;self.sessionToken=sessionToken }
     func setPort(_ value:UInt16) { port=value }
@@ -40,19 +44,22 @@ actor LocalBackend {
     private func fail(_ error:String,status:Int) -> LocalResponse { .json(["error":error],status:status) }
     private var widgetAvailable: Bool { FileManager.default.fileExists(atPath: resources.appendingPathComponent("CampusWidgetSnapshot").path) }
     private func prepare(_ school:NativeSchoolSession, client:NativeSchoolClient, remember:Bool, same:Bool, password:String?) throws {
+        var reuseWidget = false
         #if CAMPUS_ISOLATED_TEST
         guard !remember else { throw CampusHistoryError.invalid }
         #else
-        if widgetAvailable {
+        if remember && widgetAvailable { reuseWidget = WidgetAgents.isCurrent(user:school.user,same:same,resources:resources) }
+        if widgetAvailable && !reuseWidget {
             do { try WidgetAgents.disable() } catch { throw LocalSetupError.widgetAgent }
             do { try WidgetSnapshots.clear() } catch { throw LocalSetupError.widgetReset }
         }
         if remember, let password { do { try CampusKeychain.save(user:school.user,password:password) } catch { throw LocalSetupError.keychain } }
         #endif
+        generation=UUID();batches.reset()
         current=school;self.client=client;autoLogin=remember
         dashboard=NativeDashboard(client:client,current:school,autoLogin:remember)
         widgetWarning=nil
-        if remember && widgetAvailable {
+        if remember && widgetAvailable && !reuseWidget {
             do { try WidgetAgents.enable(user:school.user,networkSamePassword:same,resources:resources) }
             catch { widgetWarning="小组件后台更新尚未启用" }
         }
@@ -75,10 +82,12 @@ actor LocalBackend {
                 guard authenticated(request) else { return fail("请重新登录",status:401) }
                 do { if widgetAvailable { try WidgetAgents.disable();try WidgetSnapshots.clear() };if autoLogin,let user=current?.user {try CampusKeychain.remove(user:user)} }
                 catch {return fail("无法关闭小组件后台更新，请重试",status:503)}
+                generation=UUID();batches.reset()
                 current=nil;client=nil;dashboard=nil;autoLogin=false
                 var response=LocalResponse.json(["ok":true]);response.headers["Set-Cookie"]="campus_native_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";return response
             }
             let candidate=NativeSchoolClient()
+            let started=Date()
             do {
                 let school:NativeSchoolSession
                 var remember=false,same=false,password:String?
@@ -91,7 +100,10 @@ actor LocalBackend {
                     remember=body["autoLogin"] as? Bool == true;same=body["networkSamePassword"] as? Bool == true;password=pass
                     school=try await candidate.login(user:user,password:pass,networkSamePassword:same)
                 }
+                let setupStarted=Date()
                 try prepare(school,client:candidate,remember:remember,same:same,password:password)
+                performance.info("login local setup ms=\(Int(Date().timeIntervalSince(setupStarted)*1000), privacy: .public)")
+                performance.info("login total ms=\(Int(Date().timeIntervalSince(started)*1000), privacy: .public)")
                 var response=LocalResponse.json(["ok":true]);response.headers["Set-Cookie"]="campus_native_session=\(sessionToken); Path=/; HttpOnly; SameSite=Lax";return response
             } catch LocalSetupError.widgetAgent { return fail("无法停止小组件后台更新，请重试",status:503)
             } catch LocalSetupError.widgetReset { return fail("无法重置小组件数据，请重试",status:503)
@@ -107,6 +119,26 @@ actor LocalBackend {
                 let saved = try LocalSettings.write(user:current.user,value:settings)
                 return .json(["settings":(try JSONSerialization.jsonObject(with:JSONEncoder().encode(saved)))])
             } catch { return fail("请检查宿舍名称和电表号",status:400) }
+        }
+        if path == "/api/data/part",request.method == "GET" {
+            guard let components=URLComponents(string:"http://127.0.0.1"+request.target),
+                  let part=components.queryItems?.first(where:{$0.name == "part"})?.value,
+                  ["card","net","electricity"].contains(part),
+                  let batch=components.queryItems?.first(where:{$0.name == "batch"})?.value,
+                  UUID(uuidString:batch) != nil else { return fail("请求参数错误",status:400) }
+            let requestGeneration=generation, started=Date()
+            batches.begin(batch,now:started)
+            let values=await dashboard.part(part)
+            guard generation == requestGeneration else { return fail("请重新登录",status:401) }
+            performance.info("data part=\(part, privacy:.public) ms=\(Int(Date().timeIntervalSince(started)*1000), privacy:.public)")
+            if let complete=batches.complete(batch,values:values) {
+                #if !CAMPUS_ISOLATED_TEST
+                if widgetAvailable { try? WidgetSnapshots.publish(complete) }
+                #endif
+            }
+            var response:[String:Any]=["data":values]
+            if let warning=widgetWarning { response["widgetWarning"]=warning }
+            return .json(response)
         }
         if path == "/api/data",request.method == "GET" {
             let snapshot=await dashboard.refresh()

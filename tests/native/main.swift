@@ -71,3 +71,20 @@ check(LocalSettings.read(user:"testuser",home:tempHome) == settings, "settings r
 check(LocalSettings.read(user:"other",home:tempHome) != settings, "account isolation")
 do { try DormSettings(dorm:"", lighting:"../../bad", air:"", historyOwner:"").validate(); fatalError("invalid meter accepted") } catch {}
 print("Native settings tests passed")
+let resource = URL(fileURLWithPath:"/tmp/widget-resources")
+let refresh: [String:Any] = ["ProgramArguments":[resource.appendingPathComponent("CampusWidgetRefresh").path],"EnvironmentVariables":["CAMPUS_WIDGET_HELPER":resource.appendingPathComponent("CampusWidgetSnapshot").path],"RunAtLoad":true,"StartCalendarInterval":["Hour":8,"Minute":30]]
+let bridge: [String:Any] = ["ProgramArguments":[resource.appendingPathComponent("CampusWidgetBridge").path,resource.appendingPathComponent("widget-token").path],"RunAtLoad":true,"KeepAlive":true]
+let jobConfig: [String:Any] = ["user":"testuser","networkSamePassword":true]
+check(WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"testuser",same:true,resources:resource), "reuse matching agents")
+check(!WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"other",same:true,resources:resource), "different account must not reuse")
+check(!WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"testuser",same:false,resources:resource), "different network policy must not reuse")
+print("Native agent reuse tests passed")
+var batches = RefreshBatches()
+let good: [String:Any] = ["status":"ok","value":42.0]
+batches.begin("old");batches.begin("new")
+check(batches.complete("new",values:["card":good,"net":good]) == nil, "do not publish partial snapshot")
+check(batches.complete("old",values:["card":good,"net":good,"lighting":good,"air":good]) == nil, "stale snapshot must not publish")
+check(batches.complete("new",values:["lighting":good,"air":good]) != nil, "publish newest complete snapshot")
+batches.begin("logged-out");batches.reset()
+check(batches.complete("logged-out",values:["card":good,"net":good,"lighting":good,"air":good]) == nil, "reset discards previous session")
+print("Native refresh batching tests passed")
