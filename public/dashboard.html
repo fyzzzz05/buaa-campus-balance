@@ -28,9 +28,9 @@ html{height:100%}
 body{
   margin:0;min-height:100%;background:var(--bg);color:var(--ink);
   font-family:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
-  display:grid;place-items:center;padding:24px;
+  display:flex;justify-content:center;padding:clamp(12px,2.5vw,32px);
 }
-.wrap{width:min(1040px,100%)}
+.wrap{width:min(1440px,100%);min-width:0;margin-block:auto}
 header{display:flex;justify-content:space-between;align-items:center;margin:0 4px 16px}
 h1{font-size:18px;font-weight:600;margin:0}
 .right{display:flex;align-items:center;gap:14px}
@@ -40,7 +40,7 @@ h1{font-size:18px;font-weight:600;margin:0}
 .btn[hidden]{display:none}#reauth{margin-top:10px}
 .btn:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
-.board{display:grid;grid-template-columns:300px 1fr;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;min-height:440px}
+.board{display:grid;grid-template-columns:clamp(240px,27%,340px) minmax(0,1fr);background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;min-height:440px}
 .side{position:relative;display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--side);border-right:1px solid var(--line)}
 .pill{position:absolute;left:0;top:0;width:0;height:0;border-radius:14px;background:var(--accent);z-index:0;pointer-events:none}
 .ready .pill{transition:transform .55s cubic-bezier(.22,1,.36,1),width .55s cubic-bezier(.22,1,.36,1),height .55s cubic-bezier(.22,1,.36,1)}
@@ -141,6 +141,37 @@ dialog input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .settings-error{font-size:12px;color:#c2402d;margin:0}.settings-error:empty{display:none}
 .extra-settings{font-size:13px;color:var(--muted)}.extra-settings summary{cursor:pointer}.extra-settings .meter-field{margin-top:14px}
 @media (max-width:560px){.right #stamp{display:none}}
+/* A short window should fit the rail and chart before the page needs to scroll. */
+@media (max-height:760px){
+ body{padding-block:12px}
+ header{margin-bottom:10px}
+ .board{min-height:0}
+ .side{gap:4px;padding:8px}
+ .item{gap:3px;padding:clamp(7px,1.5vh,12px) 14px}
+ .item .v{font-size:clamp(22px,4.3vh,30px)}
+ .item .l,.item .s{font-size:12px}
+ .hint{padding-top:4px}
+ .main{padding:16px 22px;gap:10px}
+ .chart{height:clamp(130px,32vh,230px)}
+ .stats{padding-top:10px}
+ .stat .n{font-size:19px}
+}
+@media (min-width:1100px) and (min-height:850px){
+ .side{gap:10px;padding:16px}
+ .item{flex:1;justify-content:center}
+ .main{padding:clamp(28px,3vw,44px);gap:clamp(18px,2vh,28px)}
+ .chart{height:clamp(280px,38vh,460px)}
+}
+@media (max-width:760px) and (max-height:760px){
+ .side{padding:7px;gap:3px}
+ .item{padding:8px 10px}
+ .main{padding:14px 12px}
+ .item .v{font-size:clamp(18px,4.5vw,25px)}
+ .stat .n{font-size:16px}
+}
+@media (max-width:460px){
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:10px}
+}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
