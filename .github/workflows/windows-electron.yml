@@ -38,12 +38,12 @@ jobs:
           TAG="${{ github.ref_name }}"
           if [ -f "docs/releases/$TAG.md" ]; then
             if ! gh release view "$TAG" >/dev/null 2>&1; then
-              gh release create "$TAG" --draft --title "校园余额 Windows ${TAG}" --notes-file "docs/releases/$TAG.md"
+              gh release create "$TAG" --draft --latest=false --title "校园余额 Windows ${TAG#win-}" --notes-file "docs/releases/$TAG.md"
             fi
           else
             if ! gh release view "$TAG" >/dev/null 2>&1; then
-              gh release create "$TAG" --draft --title "校园余额 Windows ${TAG}" --generate-notes
+              gh release create "$TAG" --draft --latest=false --title "校园余额 Windows ${TAG#win-}" --generate-notes
             fi
           fi
           gh release upload "$TAG" dist-electron/*-setup.exe --clobber
-          gh release edit "$TAG" --draft=false
+          gh release edit "$TAG" --draft=false --latest=false
