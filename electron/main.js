@@ -312,7 +312,7 @@ function createTrayPanel() {
       session: session.fromPartition('panel'),
     },
   });
-  panelWindow.setAlwaysOnTop(true, 'popup');
+  panelWindow.setAlwaysOnTop(true, 'pop-up-menu');
   panelWindow.loadFile(path.join(__dirname, 'tray-panel.html')).catch(() => {});
   panelWindow.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
   panelWindow.webContents.on('will-navigate', event => event.preventDefault());
