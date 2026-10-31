@@ -7,7 +7,7 @@ struct ElectricityConfig {
 }
 struct ElectricityReading {
     let value: Double
-    var note: String
+    let note: String
     let history: [CampusDayValue]
     var transportDiagnostic: [String:Any]? = nil
 }
@@ -100,8 +100,19 @@ enum Electricity {
         guard !field("电价:").isEmpty else { throw CampusIssue(code:.fieldMissing,field:.price) }
         guard let price = number(field("电价:")), price.isFinite, price >= 0 else { throw CampusIssue(code:.meterValueInvalid,field:.price) }
         guard let quantity = number(quantityText), quantity.isFinite, quantity >= 0 else { throw CampusIssue(code:.meterValueInvalid,field:.quantity) }
-        let note = paragraphs.first(where: { $0.contains("截止") }) ?? "学校电表"
+        let note = cutoffNote(paragraphs.first(where: { $0.contains("截止") || $0.contains("截至") }) ?? "")
         return ElectricityReading(value: (price * quantity * 100).rounded() / 100, note: note, history: [])
+    }
+
+    static func cutoffNote(_ text: String) -> String {
+        let expression = try! NSRegularExpression(pattern:#"(?:截止|截至)\s*(\d{4})[/-](\d{1,2})[/-](\d{1,2})"#)
+        guard let match = expression.firstMatch(in:text,range:NSRange(text.startIndex...,in:text)) else { return "学校电表" }
+        let parts = (1...3).compactMap { index in Range(match.range(at:index),in:text).flatMap { Int(text[$0]) } }
+        guard parts.count == 3 else { return "学校电表" }
+        let calendar = Calendar(identifier:.gregorian)
+        let components = DateComponents(year:parts[0],month:parts[1],day:parts[2])
+        guard let date = calendar.date(from:components), calendar.dateComponents([.year,.month,.day],from:date) == components else { return "学校电表" }
+        return String(format:"截至 %04d-%02d-%02d",parts[0],parts[1],parts[2])
     }
 
     static func fetchHistory(config: ElectricityConfig) async throws -> [String: ElectricityReading] {
@@ -147,7 +158,6 @@ enum Electricity {
             guard issue.code == .connection || issue.code == .timeout else { throw error }
             let diagnostic = CampusDiagnostics.report(error,stage:kind == "air" ? .airMeter : .lightingMeter)
             var reading = try await read(.http)
-            reading.note += " · HTTP 查询"
             reading.transportDiagnostic = diagnostic
             return reading
         }

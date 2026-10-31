@@ -50,7 +50,7 @@ test('missing electricity fields and transport errors stay visible when history 
   });
   const data=await campus.electricity({lighting:'123',air:'456',historyOwner:'example'});
   assert.equal(data.lighting.status,'ok');assert.equal(data.lighting.value,10);assert.equal(data.lighting.fallbackDiagnostic.code,'CONNECTION_FAILED');
-  assert.match(data.lighting.note,/历史余额/);assert.equal(data.air.status,'unavailable');assert.equal(data.air.diagnostic.stage,'airMeter');
+  assert.equal(data.lighting.note,'截至 2026-10-31');assert.equal(data.air.status,'unavailable');assert.equal(data.air.diagnostic.stage,'airMeter');
   assert(!JSON.stringify(data).includes('secret'));
 });
 
@@ -66,10 +66,10 @@ test('electricity falls back to HTTP only after a connection failure and accepts
     calls.push(new URL(url).protocol);
     assert.equal(options.redirect,'manual');assert.equal(options.headers.cookie,undefined);
     if(new URL(url).protocol==='https:'){const error=new Error('refused');error.cause={code:'ECONNREFUSED'};throw error}
-    return {ok:true,status:200,text:async()=>'<p>购电表号:123</p><p>地哈哈址:某楼[照明]</p><p>电哈哈价:0.5</p><svg id="canvas1"><tspan>20</tspan></svg>'};
+    return {ok:true,status:200,text:async()=>'<p>购电表号:123</p><p>地哈哈址:某楼[照明]</p><p>电哈哈价:0.5</p><p>[截止 2026/10/31 0:00:00]</p><svg id="canvas1"><tspan>20</tspan></svg>'};
   });
   const reading=await campus.meterReading('123','lighting');
-  assert.deepEqual(calls,['https:','http:']);assert.equal(reading.value,10);assert.match(reading.note,/HTTP 查询/);
+  assert.deepEqual(calls,['https:','http:']);assert.equal(reading.value,10);assert.equal(reading.note,'截至 2026-10-31');
   assert.equal(reading.transportDiagnostic.code,'CONNECTION_FAILED');assert.equal(reading.transportDiagnostic.port,443);
 });
 

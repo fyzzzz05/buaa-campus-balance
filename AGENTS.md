@@ -4,6 +4,8 @@
 
 Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
 
+- 未经用户明确要求，不更改页面布局或正常状态文案；协议、HTTP 回退、历史兜底等调试信息保留在诊断日志中。
+
 ## 发布
 
 - 用户要求：今后发布仅上传 DMG 安装包，不上传 ZIP 等其他发布附件。

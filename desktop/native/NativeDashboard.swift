@@ -77,7 +77,6 @@ actor NativeDashboard {
                     "history":encodeHistory(old?.history ?? []), "historyNote":old == nil ? "暂无历史数据" : "余额减少估算 · 元"]
                 if let diagnostic = liveDiagnostic {
                     data["fallbackDiagnostic"] = diagnostic
-                    data["note"] = value.note + " · 实时查询失败，显示历史余额"
                 }
                 if let diagnostic = live?.transportDiagnostic { data["transportDiagnostic"] = diagnostic }
                 if let diagnostic = historyDiagnostic { data["historyDiagnostic"] = diagnostic; data["historyNote"] = diagnostic["message"] }

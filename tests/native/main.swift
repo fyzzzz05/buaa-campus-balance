@@ -158,7 +158,9 @@ let meterSession = URLSession(configuration:meterConfiguration)
 MeterTestProtocol.fixture = aliasedMeterHTML
 let fallbackReading = try await Electricity.fetchMeter(id:"123",kind:"lighting",session:meterSession)
 check(MeterTestProtocol.schemes == ["https","http"], "HTTPS connection failure falls back to HTTP once")
-check(fallbackReading.value == 10 && fallbackReading.note.contains("HTTP 查询"), "HTTP fallback source shown")
+check(fallbackReading.value == 10 && fallbackReading.note == "截至 2026-10-27", "HTTP details do not alter the balance date note")
+check(Electricity.cutoffNote("[截止 2026/10/31 0:00:00]") == "截至 2026-10-31", "normalize school cutoff date")
+check(Electricity.cutoffNote("截止 2026/2/30") == "学校电表", "reject invalid cutoff date")
 check(fallbackReading.transportDiagnostic?["code"] as? String == "CONNECTION_FAILED", "HTTPS failure preserved on success")
 MeterTestProtocol.schemes = []; MeterTestProtocol.secureFailure = NSURLErrorServerCertificateUntrusted
 do { _ = try await Electricity.fetchMeter(id:"123",kind:"lighting",session:meterSession); fatalError("TLS failure accepted") }
