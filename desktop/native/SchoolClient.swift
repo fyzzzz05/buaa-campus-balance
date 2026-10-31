@@ -101,18 +101,24 @@ final class NativeSchoolClient {
     }
 
     func networkBalance(_ current: NativeSchoolSession) async throws -> NetworkQuota {
-        guard let digest = current.networkDigest else { throw NativeSchoolError.unavailable }
+        guard let digest = current.networkDigest else { throw CampusIssue(code:.networkNotConfigured) }
         let home = try makeURL("https://zfw.buaa.edu.cn/home")
         func read() async throws -> NetworkQuota {
-            let (data, _) = try await http.request(URLRequest(url: home))
+            let (data, response) = try await http.request(URLRequest(url: home))
+            if response.url?.path == "/login" { throw CampusIssue(code:.loginRequired) }
             guard let html = String(data: data, encoding: .utf8) else { throw NativeSchoolError.invalidResponse }
             return try SchoolHTML.quota(html)
         }
-        if let quota = try? await read() { return quota }
+        do { return try await read() }
+        catch { if CampusDiagnostics.issue(error).code != .loginRequired { throw error } }
         let sso = Data("zh-CN:\(current.user):\(digest)".utf8).base64EncodedString()
         let url = try makeURL("https://zfw.buaa.edu.cn/site/sso", query: [URLQueryItem(name: "data", value: sso)])
         _ = try await http.request(URLRequest(url: url))
-        return try await read()
+        do { return try await read() }
+        catch {
+            if CampusDiagnostics.issue(error).code == .loginRequired { throw CampusDiagnostics.contextualize(error,url:url) }
+            throw error
+        }
     }
     static func recentDays(count: Int, now: Date = Date()) -> [String] {
         var calendar = Calendar(identifier: .gregorian)

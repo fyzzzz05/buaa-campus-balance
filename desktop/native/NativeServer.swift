@@ -108,7 +108,10 @@ actor LocalBackend {
             } catch LocalSetupError.widgetAgent { return fail("无法停止小组件后台更新，请重试",status:503)
             } catch LocalSetupError.widgetReset { return fail("无法重置小组件数据，请重试",status:503)
             } catch LocalSetupError.keychain { return fail("无法保存到钥匙串，请解锁钥匙串后重试",status:503)
-            } catch { return fail("登录失败或学校认证暂不可用，请重试",status:401) }
+            } catch {
+                let diagnostic = CampusDiagnostics.report(error,stage:.schoolLogin)
+                return .json(["error":diagnostic["message"] ?? "登录失败", "diagnostic":diagnostic],status:401)
+            }
         }
         guard authenticated(request),let current,let dashboard else { return fail("请重新登录",status:401) }
         if path == "/api/settings" {

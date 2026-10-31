@@ -33,9 +33,18 @@ test('network quotas are read from the actual table, not from labels elsewhere',
   assert.equal(campus.quota('登录 免费流量剩余'),null);
 });
 
+test('network quota accepts exhausted free traffic reported as 0byte', () => {
+  const table = free => `<table><tr><th>已用流量</th><th>免费流量剩余(不含套餐)</th><th>计费流量剩余(不含套餐)</th></tr><tr><td>70.000G</td><td>${free}</td><td>40.000G</td></tr></table>`;
+  assert.deepEqual(campus.quota(table('0byte')), {used:70,free:0,paid:40});
+  for (const unit of ['B', 'byte', 'BYTES']) {
+    assert.deepEqual(campus.quota(table(`1073741824 ${unit}`)), {used:70,free:1,paid:40});
+  }
+  assert.equal(campus.quota(table('未知')), null);
+});
+
 test('sensitive upstream requests refuse redirects to unrelated domains', async () => {
   const {CookieJar} = require('tough-cookie');
-  await assert.rejects(campus.request(new CookieJar(), 'https://example.com/'),/Unexpected redirect/);
+  await assert.rejects(campus.request(new CookieJar(), 'https://example.com/'),{code:'REDIRECT_BLOCKED'});
 });
 
 test('only an authenticated school account yields a session; password is not retained', async (t) => {

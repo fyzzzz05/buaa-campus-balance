@@ -39,6 +39,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --notes "macOS Apple Silicon 原生版，包含校园余额桌面小组件（macOS 14 或更新版本），不再内置 Node.js。未使用 Apple Developer ID 签名与公证。"
+          if [ -f "docs/releases/$GITHUB_REF_NAME.md" ]; then
+            gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --notes-file "docs/releases/$GITHUB_REF_NAME.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --generate-notes
+          fi
           gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

@@ -66,10 +66,14 @@ final class SchoolHTTP {
 
     func request(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url, SchoolRedirectPolicy.allowed(url) else { throw SchoolHTTPError.disallowedURL }
-        let (data, response) = try await session.data(for: request, delegate: policy)
-        guard data.count <= 3_000_000 else { throw SchoolHTTPError.responseTooLarge }
-        guard let http = response as? HTTPURLResponse, let final = http.url, SchoolRedirectPolicy.allowed(final),
-              !(300...399).contains(http.statusCode) else { throw SchoolHTTPError.unexpectedResponse }
-        return (data, http)
+        do {
+            let (data, response) = try await session.data(for: request, delegate: policy)
+            guard data.count <= 3_000_000 else { throw CampusIssue(code:.responseTooLarge) }
+            guard let http = response as? HTTPURLResponse, let final = http.url, SchoolRedirectPolicy.allowed(final) else { throw CampusIssue(code:.invalidResponse) }
+            guard !(300...399).contains(http.statusCode) else { throw CampusIssue(code:.redirect) }
+            guard http.statusCode != 401 else { throw CampusIssue(code:.loginRequired,httpStatus:401) }
+            guard (200...299).contains(http.statusCode) else { throw CampusIssue(code:.http,httpStatus:http.statusCode) }
+            return (data, http)
+        } catch { throw CampusDiagnostics.contextualize(error,url:url) }
     }
 }

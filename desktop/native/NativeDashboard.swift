@@ -31,10 +31,12 @@ actor NativeDashboard {
             data["history"] = encodeHistory(history.history); data["records"] = encodeRecords(history.records)
             data["historyNote"] = "校园卡消费 · 元"; data["historySource"] = "transactions"
         } catch {
+            let diagnostic = CampusDiagnostics.report(error,stage:.cardHistory)
+            data["historyDiagnostic"] = diagnostic
             if let fallback = try? CardFallback.capture(value:value,user:current.user) {
                 data["history"] = encodeHistory(fallback.history); data["records"] = encodeRecords(fallback.records)
-                data["historyNote"] = "余额减少估算 · 流水暂不可用"; data["emptyNote"] = "暂无消费明细"
-            } else { data["historyNote"] = "消费流水暂不可用" }
+                data["historyNote"] = "余额减少估算 · " + (diagnostic["message"] as? String ?? "消费流水查询失败"); data["emptyNote"] = "暂无消费明细"
+            } else { data["historyNote"] = diagnostic["message"] }
         }
         return data
     }
@@ -45,46 +47,80 @@ actor NativeDashboard {
         do {
             let history = try await client.networkHistory()
             data["history"] = encodeHistory(history.history); data["records"] = encodeRecords(history.records); data["historyNote"] = "按学校结算日 · GB"
-        } catch { data["historyNote"] = "流水暂不可用" }
+        } catch {
+            let diagnostic = CampusDiagnostics.report(error,stage:.networkHistory)
+            data["historyNote"] = diagnostic["message"]; data["historyDiagnostic"] = diagnostic
+        }
         return data
     }
     private func electricityData() async -> [String: [String: Any]] {
         let settings = LocalSettings.read(user: current.user)
         let config = ElectricityConfig(lighting:settings.lighting, air:settings.air, historyOwner:settings.historyOwner)
-        async let historyRequest = try? Electricity.fetchHistory(config:config)
-        async let lightingRequest = config.lighting.isEmpty ? nil : try? Electricity.fetchMeter(id:config.lighting,kind:"lighting")
-        async let airRequest = config.air.isEmpty ? nil : try? Electricity.fetchMeter(id:config.air,kind:"air")
+        async let historyRequest = capture { config.historyOwner.isEmpty ? [:] : try await Electricity.fetchHistory(config:config) }
+        async let lightingRequest = capture { config.lighting.isEmpty ? nil : try await Electricity.fetchMeter(id:config.lighting,kind:"lighting") }
+        async let airRequest = capture { config.air.isEmpty ? nil : try await Electricity.fetchMeter(id:config.air,kind:"air") }
         let (loadedHistory, lighting, air) = await (historyRequest, lightingRequest, airRequest)
-        let history = loadedHistory ?? [:]
+        let history = (try? loadedHistory.get()) ?? [:]
+        let historyDiagnostic: [String:Any]?
+        if case .failure(let error) = loadedHistory { historyDiagnostic = CampusDiagnostics.report(error,stage:.electricityHistory) }
+        else { historyDiagnostic = nil }
         var result: [String: [String: Any]] = [:]
-        for (kind, id, live) in [("lighting",config.lighting,lighting),("air",config.air,air)] {
+        for (kind, id, loaded) in [("lighting",config.lighting,lighting),("air",config.air,air)] {
             guard !id.isEmpty else { result[kind] = ["status":"unavailable", "note":"请先设置宿舍电表"]; continue }
+            let live = try? loaded.get()
+            let liveDiagnostic: [String:Any]?
+            if case .failure(let error) = loaded { liveDiagnostic = CampusDiagnostics.report(error,stage:kind == "air" ? .airMeter : .lightingMeter) }
+            else { liveDiagnostic = nil }
             if let value = live ?? history[kind] {
                 let old = history[kind]
-                result[kind] = ["status":"ok", "value":value.value, "unit":"元", "note":value.note,
+                var data: [String:Any] = ["status":"ok", "value":value.value, "unit":"元", "note":value.note,
                     "history":encodeHistory(old?.history ?? []), "historyNote":old == nil ? "暂无历史数据" : "余额减少估算 · 元"]
-            } else { result[kind] = ["status":"unavailable", "note":"电表暂不可用"] }
+                if let diagnostic = liveDiagnostic {
+                    data["fallbackDiagnostic"] = diagnostic
+                    data["note"] = value.note + " · 实时查询失败，显示历史余额"
+                }
+                if let diagnostic = live?.transportDiagnostic { data["transportDiagnostic"] = diagnostic }
+                if let diagnostic = historyDiagnostic { data["historyDiagnostic"] = diagnostic; data["historyNote"] = diagnostic["message"] }
+                result[kind] = data
+            } else {
+                let diagnostic = liveDiagnostic ?? CampusDiagnostics.describe(CampusIssue(code:.invalidResponse),stage:kind == "air" ? .airMeter : .lightingMeter)
+                result[kind] = ["status":"unavailable", "note":diagnostic["message"] ?? "电表查询失败", "diagnostic":diagnostic]
+                if let diagnostic = historyDiagnostic { result[kind]?["historyDiagnostic"] = diagnostic }
+            }
         }
         return result
+    }
+    private func capture<T>(_ operation: () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await operation()) } catch { return .failure(error) }
     }
     private func cardWithReauthentication(balanceOnly: Bool) async -> [String: Any] {
         do { return try await cardData(balanceOnly:balanceOnly) }
         catch {
-            if autoLogin, let password = try? CampusKeychain.read(user:current.user) {
-                let newClient = NativeSchoolClient()
-                if let renewed = try? await newClient.login(user:current.user,password:password,networkSamePassword:current.networkDigest != nil) {
-                    self.client = newClient; self.current = renewed
-                    return (try? await cardData(balanceOnly:balanceOnly)) ?? ["status":"login_required","note":"自动登录失败，请重新登录"]
-                }
-                return ["status":"login_required","note":"自动登录失败，请重新登录"]
+            // A parsing or transport error must not trigger an unnecessary login.
+            guard CampusDiagnostics.issue(error).code == .loginRequired else {
+                return CampusDiagnostics.failure(error,stage:.cardBalance)
             }
-            return ["status":"unavailable","note":"饭卡查询暂不可用"]
+            guard autoLogin else { return CampusDiagnostics.failure(error,stage:.cardBalance,status:"login_required") }
+            let password: String
+            do { password = try CampusKeychain.read(user:current.user) }
+            catch { return CampusDiagnostics.failure(CampusIssue(code:.keychain),stage:.autoLogin,status:"login_required") }
+            let newClient = NativeSchoolClient()
+            do {
+                let renewed = try await newClient.login(user:current.user,password:password,networkSamePassword:current.networkDigest != nil)
+                self.client = newClient; self.current = renewed
+            } catch { return CampusDiagnostics.failure(error,stage:.schoolLogin,status:"login_required") }
+            do { return try await cardData(balanceOnly:balanceOnly) }
+            catch { return CampusDiagnostics.failure(error,stage:.cardBalance,status:CampusDiagnostics.issue(error).code == .loginRequired ? "login_required" : "unavailable") }
         }
+    }
+    private func networkWithDiagnostics(balanceOnly: Bool) async -> [String:Any] {
+        do { return try await networkData(balanceOnly:balanceOnly) }
+        catch { return CampusDiagnostics.failure(error,stage:.networkBalance,status:CampusDiagnostics.issue(error).code == .loginRequired ? "login_required" : "unavailable") }
     }
     func part(_ part: String) async -> [String: [String: Any]] {
         switch part {
         case "card": return ["card":await cardWithReauthentication(balanceOnly:false)]
-        case "net": return ["net":(try? await networkData()) ?? ["status":"unavailable", "note":"校园网查询暂不可用"]]
+        case "net": return ["net":await networkWithDiagnostics(balanceOnly:false)]
         case "electricity": return await electricityData()
         default: return [:]
         }
@@ -92,7 +128,7 @@ actor NativeDashboard {
     func refresh(balanceOnly: Bool = false) async -> NativeDashboardSnapshot {
         async let power = electricityData()
         let card = await cardWithReauthentication(balanceOnly:balanceOnly)
-        let net = (try? await networkData(balanceOnly:balanceOnly)) ?? ["status":"unavailable", "note":"校园网查询暂不可用"]
+        let net = await networkWithDiagnostics(balanceOnly:balanceOnly)
         let electricity = await power
         return NativeDashboardSnapshot(card:card, net:net,
             lighting:electricity["lighting"] ?? ["status":"unavailable"], air:electricity["air"] ?? ["status":"unavailable"])

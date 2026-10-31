@@ -32,7 +32,7 @@ enum SchoolHTML {
     }
 
     private static func quotaValue(_ raw: String) -> Double? {
-        let pattern = #"^\s*(\d+(?:\.\d+)?)\s*(G|GB|M|MB|K|KB|T|TB)\s*$"#
+        let pattern = #"^\s*(\d+(?:\.\d+)?)\s*(G|GB|M|MB|K|KB|T|TB|B|BYTE|BYTES)\s*$"#
         guard let expression = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
               let match = expression.firstMatch(in: raw, range: NSRange(raw.startIndex..., in: raw)),
               let numberRange = Range(match.range(at: 1), in: raw), let unitRange = Range(match.range(at: 2), in: raw),
@@ -43,6 +43,7 @@ enum SchoolHTML {
         case "m": multiplier = 1 / 1024
         case "k": multiplier = 1 / (1024 * 1024)
         case "t": multiplier = 1024
+        case "b": multiplier = 1 / (1024 * 1024 * 1024)
         default: return nil
         }
         return number * multiplier
@@ -50,20 +51,24 @@ enum SchoolHTML {
 
     static func quota(_ html: String) throws -> NetworkQuota {
         let document = try document(html)
+        if !(try document.nodes(forXPath: "//form[@id='login-form']")).isEmpty { throw CampusIssue(code:.loginRequired) }
         for case let table as XMLElement in try document.nodes(forXPath: "//table") {
             let rows = try table.nodes(forXPath: ".//tr")
             for index in rows.indices {
                 let columns = try rows[index].nodes(forXPath: "./th|./td").map { ($0.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
                 guard let freeIndex = columns.firstIndex(where: { $0.contains("免费流量剩余") }),
                       let paidIndex = columns.firstIndex(where: { $0.contains("计费流量剩余") }),
-                      let usedIndex = columns.firstIndex(where: { $0.contains("已用流量") }), index + 1 < rows.count else { continue }
+                      let usedIndex = columns.firstIndex(where: { $0.contains("已用流量") }) else { continue }
+                guard index + 1 < rows.count else { throw CampusIssue(code:.invalidResponse) }
                 let values = try rows[index + 1].nodes(forXPath: "./th|./td").map { $0.stringValue ?? "" }
-                guard max(freeIndex, paidIndex, usedIndex) < values.count,
-                      let free = quotaValue(values[freeIndex]), let paid = quotaValue(values[paidIndex]), let used = quotaValue(values[usedIndex]) else { continue }
+                guard max(freeIndex, paidIndex, usedIndex) < values.count else { throw CampusIssue(code:.invalidResponse) }
+                guard let free = quotaValue(values[freeIndex]) else { throw CampusIssue(code:.quotaValueInvalid,field:.free) }
+                guard let paid = quotaValue(values[paidIndex]) else { throw CampusIssue(code:.quotaValueInvalid,field:.paid) }
+                guard let used = quotaValue(values[usedIndex]) else { throw CampusIssue(code:.quotaValueInvalid,field:.used) }
                 return NetworkQuota(free: free, paid: paid, used: used)
             }
         }
-        throw CampusHistoryError.invalid
+        throw CampusIssue(code:.quotaTableMissing)
     }
     static func networkPage(_ html: String) throws -> (total: Int, rows: [(date: String, bytes: Double)]) {
         let doc = try document(html)

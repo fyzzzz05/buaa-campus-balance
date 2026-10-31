@@ -1,4 +1,5 @@
 const campus = require('../lib/campus');
+const diagnostics = require('../lib/diagnostics');
 const session = require('../lib/session');
 const cardHistory = require('../lib/card-history');
 const settings = require('../lib/settings');
@@ -16,16 +17,16 @@ module.exports = async function handler(req, res) {
     data.card = await campus.card(current);
     if (data.card.status === 'login_required' && current.autoLogin === true && (process.env.CAMPUS_WEB === '1' || process.env.CAMPUS_APP === '1')) {
       try {
-        const password=await credentials.read(current.user);
+        const password=await credentials.read(current.user).catch(()=>{throw new diagnostics.CampusIssue('KEYCHAIN_FAILED')});
         const refreshed=await campus.login(current.user,password,Boolean(current.netDigest));
         Object.assign(current,refreshed,{autoLogin:true});
         data.card=await campus.card(current);
-      } catch { data.card={status:'login_required',note:'自动登录失败，请重新登录'}; }
+      } catch (err) { data.card=diagnostics.failure(err,'autoLogin','login_required'); }
     }
-    if (data.card.status === 'ok' && data.card.historySource !== 'transactions') { try { cardHistory.capture(data.card, current.user); data.card.historyNote = '余额减少估算 · 流水暂不可用'; } catch {} }
-  } catch { data.card = {status:'unavailable',note:'饭卡查询暂不可用'}; }
-  try { data.net = await campus.network(current); } catch { data.net = {status:'unavailable',note:'校园网查询暂不可用'}; }
-  try { Object.assign(data, await campus.electricity(settings.read(current.user))); } catch { data.lighting = data.air = {status:'unavailable',note:'电费查询暂不可用'}; }
+    if (data.card.status === 'ok' && data.card.historySource !== 'transactions') { try { cardHistory.capture(data.card, current.user); data.card.historyNote = '余额减少估算 · '+(data.card.historyDiagnostic?.message || '消费流水查询失败'); } catch {} }
+  } catch (err) { data.card = diagnostics.failure(err,'cardBalance'); }
+  try { data.net = await campus.network(current); } catch (err) { data.net = diagnostics.failure(err,'networkBalance'); }
+  try { Object.assign(data, await campus.electricity(settings.read(current.user))); } catch (err) { data.lighting = data.air = diagnostics.failure(err,'electricityMeter'); }
   if (current.widgetWarning) data.widgetWarning=current.widgetWarning;
   try { await widgetSnapshot.publish(data); } catch { data.widgetWarning='小组件数据共享暂不可用'; }
   try { session.write(res, current); } catch { return res.status(503).json({error:'登录状态暂不可用'}); }

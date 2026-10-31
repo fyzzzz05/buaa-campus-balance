@@ -5,6 +5,7 @@
   <key>CFBundleDisplayName</key><string>校园余额</string>
   <key>CFBundleIdentifier</key><string>edu.buaa.personal.campusbalance</string>
   <key>CFBundleExecutable</key><string>CampusBalance</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
@@ -15,5 +16,8 @@
   <key>SUVerifyUpdateBeforeExtraction</key><true/>
   <key>SURequireSignedFeed</key><true/>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
+  <key>NSAppTransportSecurity</key><dict>
+    <key>NSAllowsLocalNetworking</key><true/>
+    <key>NSExceptionDomains</key><dict><key>shsd.buaa.edu.cn</key><dict><key>NSExceptionAllowsInsecureHTTPLoads</key><true/></dict></dict>
+  </dict>
 </dict></plist>

@@ -9,7 +9,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var server: Process?
     private var pendingOutput = ""
     private var terminating = false
-    private var updaterController: SPUStandardUpdaterController!
     private var localURL: URL!
     private var nativeToken = ""
     private var schoolLogin = false
@@ -17,11 +16,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var pendingMetric: String?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         configureMenu()
         let rect = NSRect(x: 0, y: 0, width: 1050, height: 720)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "校园余额"
+        window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 340, height: 560)
         window.center()
         let config = WKWebViewConfiguration()
@@ -43,13 +42,59 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         mainMenu.addItem(appItem)
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于校园余额", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        let updateItem = NSMenuItem(title: "检查更新…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
-        updateItem.target = updaterController
+        let updateItem = NSMenuItem(title: "下载更新…", action: #selector(openReleases(_:)), keyEquivalent: "")
+        updateItem.target = self
         appMenu.addItem(updateItem)
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "隐藏校园余额", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: "隐藏其他应用", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: "显示全部", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出校园余额", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
+
+        let fileMenu = NSMenu(title: "文件")
+        fileMenu.addItem(withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+        mainMenu.addItem(withTitle: "文件", action: nil, keyEquivalent: "").submenu = fileMenu
+
+        let editMenu = NSMenu(title: "编辑")
+        editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")
+        let redo = editMenu.addItem(withTitle: "重做", action: Selector(("redo:")), keyEquivalent: "z")
+        redo.keyEquivalentModifierMask = [.command, .shift]
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "剪切", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "拷贝", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "粘贴", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "全选", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        mainMenu.addItem(withTitle: "编辑", action: nil, keyEquivalent: "").submenu = editMenu
+
+        let windowMenu = NSMenu(title: "窗口")
+        windowMenu.addItem(withTitle: "最小化", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "缩放", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(.separator())
+        windowMenu.addItem(withTitle: "前置全部窗口", action: #selector(NSApplication.arrangeInFront(_:)), keyEquivalent: "")
+        mainMenu.addItem(withTitle: "窗口", action: nil, keyEquivalent: "").submenu = windowMenu
+        NSApp.windowsMenu = windowMenu
+
+        let helpMenu = NSMenu(title: "帮助")
+        let logs = helpMenu.addItem(withTitle: "打开诊断日志", action: #selector(openDiagnostics(_:)), keyEquivalent: "")
+        logs.target = self
+        mainMenu.addItem(withTitle: "帮助", action: nil, keyEquivalent: "").submenu = helpMenu
+        NSApp.helpMenu = helpMenu
         NSApp.mainMenu = mainMenu
+    }
+
+    @objc private func openReleases(_ sender: Any?) {
+        NSWorkspace.shared.open(URL(string: "https://github.com/fyzzzz05/buaa-campus-balance/releases/latest")!)
+    }
+
+    @objc private func openDiagnostics(_ sender: Any?) {
+        let folder = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/CampusBalance")
+        try? FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        let file = folder.appendingPathComponent("diagnostics.ndjson")
+        if FileManager.default.fileExists(atPath:file.path) { NSWorkspace.shared.activateFileViewerSelecting([file]) }
+        else { NSWorkspace.shared.open(folder) }
     }
 
     private func sessionSecret() throws -> String {
@@ -182,7 +227,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let alert = NSAlert(); alert.messageText = "校园余额"; alert.informativeText = message; alert.runModal()
         NSApp.terminate(nil)
     }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        window.deminiaturize(nil)
+        window.makeKeyAndOrderFront(nil)
+        return true
+    }
     func applicationWillTerminate(_ notification: Notification) { terminating = true; if let server, server.isRunning { server.terminate() } }
 }
 

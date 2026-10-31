@@ -37,5 +37,20 @@ test('automatic reauthentication failure prompts for login and preserves other s
   t.mock.method(campus,'network',async()=>({status:'ok'}));t.mock.method(campus,'electricity',async()=>({}));
   let result;const res={setHeader(){},status(){return this},json(v){result=v;return v}};
   await handler({method:'GET',headers:{}},res);
-  assert.equal(result.data.card.status,'login_required');assert.equal(result.data.card.note,'自动登录失败，请重新登录');assert.equal(result.data.net.status,'ok');
+  assert.equal(result.data.card.status,'login_required');assert.equal(result.data.card.diagnostic.code,'KEYCHAIN_FAILED');assert.equal(result.data.net.status,'ok');
+});
+
+test('data endpoint preserves diagnostic categories while other balances remain usable',async t=>{
+  const {CampusIssue}=require('../lib/diagnostics');
+  t.mock.method(session,'read',()=>({user:'testuser',jar:{}}));t.mock.method(session,'write',()=>{});
+  t.mock.method(campus,'card',async()=>({status:'ok',value:10,historySource:'transactions'}));
+  t.mock.method(campus,'network',async()=>{throw new CampusIssue('QUOTA_VALUE_INVALID',{field:'免费流量剩余'})});
+  const error=new Error('https://shsd.buaa.edu.cn/PubBuaa?id=secret-meter');error.cause={code:'ECONNREFUSED'};
+  t.mock.method(campus,'electricity',async()=>{throw error});
+  let result;const res={setHeader(){},status(){return this},json(v){result=v;return v}};
+  await handler({method:'GET',headers:{}},res);
+  assert.equal(result.data.card.status,'ok');
+  assert.equal(result.data.net.diagnostic.code,'QUOTA_VALUE_INVALID');assert.match(result.data.net.note,/免费流量剩余/);
+  assert.equal(result.data.lighting.diagnostic.code,'CONNECTION_FAILED');assert.equal(result.data.air.diagnostic.port,443);
+  assert(!JSON.stringify(result).includes('secret-meter'));
 });

@@ -65,6 +65,6 @@ test('meter query checks the requested meter and its type', async t => {
   const html='<p>购电表号:123</p><p>地址:某楼[照明]</p><p>电价:0.5</p><p>截止 2026/10/27</p><svg id="canvas1"><text><tspan>20</tspan></text></svg>';
   t.mock.method(globalThis,'fetch',async()=>({ok:true,text:async()=>html}));
   assert.equal((await campus.meterReading('123','lighting')).value,10);
-  await assert.rejects(campus.meterReading('123','air'),/mismatch/);
-  await assert.rejects(campus.meterReading('456','lighting'),/mismatch/);
+  await assert.rejects(campus.meterReading('123','air'),{code:'METER_KIND_MISMATCH'});
+  await assert.rejects(campus.meterReading('456','lighting'),{code:'METER_ID_MISMATCH'});
 });

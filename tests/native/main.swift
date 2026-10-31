@@ -38,6 +38,12 @@ check(!SchoolRedirectPolicy.allowed(URL(string: "https://sso.buaa.edu.cn:443/")!
 print("Native school redirect tests passed")
 let html = "<table><thead><tr><th>已用流量</th><th>免费流量剩余</th><th>计费流量剩余</th></tr></thead><tbody><tr><td>35.774G</td><td>34.226G</td><td>40.000G</td></tr></tbody></table>"
 check((try SchoolHTML.quota(html)) == NetworkQuota(free: 34.226, paid: 40, used: 35.774), "network quota")
+let exhaustedQuotaHTML = "<table><tr><th>已用流量</th><th>免费流量剩余(不含套餐)</th><th>计费流量剩余(不含套餐)</th></tr><tr><td>70.000G</td><td>0byte</td><td>40.000G</td></tr></table>"
+check((try SchoolHTML.quota(exhaustedQuotaHTML)) == NetworkQuota(free: 0, paid: 40, used: 70), "exhausted free quota in bytes")
+for unit in ["B", "byte", "BYTES"] {
+    let byteQuotaHTML = exhaustedQuotaHTML.replacingOccurrences(of: "0byte", with: "1073741824 " + unit)
+    check((try SchoolHTML.quota(byteQuotaHTML)) == NetworkQuota(free: 1, paid: 40, used: 70), "byte quota converted to GB")
+}
 do { _ = try SchoolHTML.quota("登录 免费流量剩余"); fatalError("should reject missing quota table") } catch {}
 let form = try SchoolHTML.loginForm("<form id='loginForm' action='login'><input name='execution' value='flow'><input name='type' value='username_password'></form>", at: URL(string: "https://sso.buaa.edu.cn/login")!)
 check(form.fields["execution"] == "flow", "login form")
@@ -88,3 +94,75 @@ check(batches.complete("new",values:["lighting":good,"air":good]) != nil, "publi
 batches.begin("logged-out");batches.reset()
 check(batches.complete("logged-out",values:["card":good,"net":good,"lighting":good,"air":good]) == nil, "reset discards previous session")
 print("Native refresh batching tests passed")
+
+for (urlCode, expected) in [(NSURLErrorTimedOut, "TIMEOUT"), (NSURLErrorCannotConnectToHost, "CONNECTION_FAILED"), (NSURLErrorCannotFindHost, "DNS_FAILED"), (NSURLErrorServerCertificateUntrusted, "TLS_FAILED")] {
+    let error = NSError(domain:NSURLErrorDomain,code:urlCode,userInfo:[NSLocalizedDescriptionKey:"secret-password-cookie", NSURLErrorFailingURLErrorKey:URL(string:"https://zfw.buaa.edu.cn/site/sso?data=secret")!])
+    let diagnostic = CampusDiagnostics.describe(error,stage:.networkAuth)
+    check(diagnostic["code"] as? String == expected, "native transport error category")
+    let encoded = String(data:try JSONSerialization.data(withJSONObject:diagnostic),encoding:.utf8)!
+    check(!encoded.contains("secret") && !encoded.contains("data="), "diagnostics omit credentials and full auth URLs")
+}
+do {
+    _ = try SchoolHTML.quota(exhaustedQuotaHTML.replacingOccurrences(of:"0byte",with:"unknown"))
+    fatalError("invalid quota accepted")
+} catch {
+    let issue = CampusDiagnostics.issue(error)
+    check(issue.code == .quotaValueInvalid && issue.field == .free, "invalid quota unit diagnosed separately")
+}
+do { _ = try SchoolHTML.quota("<form id='login-form'></form>"); fatalError("login page accepted") }
+catch { check(CampusDiagnostics.issue(error).code == .loginRequired, "recognize network login page") }
+do { _ = try SchoolHTML.quota("<table><tr><td>new layout</td></tr></table>"); fatalError("missing table accepted") }
+catch { check(CampusDiagnostics.issue(error).code == .quotaTableMissing, "recognize missing network table") }
+do { _ = try Electricity.meter(meterHTML.replacingOccurrences(of:"电价:",with:"其他字段:"),id:"123",kind:"lighting"); fatalError("missing price accepted") }
+catch { let issue = CampusDiagnostics.issue(error); check(issue.code == .fieldMissing && issue.field == .price, "missing price diagnosed separately") }
+do { _ = try Electricity.meter(meterHTML,id:"456",kind:"lighting"); fatalError("wrong meter accepted") }
+catch { check(CampusDiagnostics.issue(error).code == .meterIDMismatch, "meter identity mismatch") }
+let logDir = tempHome.appendingPathComponent("diagnostics")
+let logRecord = CampusDiagnostics.describe(CampusIssue(code:.http,httpStatus:503),stage:.lightingMeter)
+CampusDiagnostics.write(logRecord,directory:logDir)
+let logPath = logDir.appendingPathComponent("diagnostics.ndjson")
+let filePermissions = try FileManager.default.attributesOfItem(atPath:logPath.path)[.posixPermissions] as? NSNumber
+check(filePermissions?.intValue == 0o600, "private diagnostic permissions")
+try Data(repeating:32,count:262144).write(to:logPath)
+CampusDiagnostics.write(logRecord,directory:logDir)
+check(FileManager.default.fileExists(atPath:logDir.appendingPathComponent("diagnostics.ndjson.1").path), "bounded diagnostic rotation")
+let logData = try Data(contentsOf:logPath)
+let logged = try JSONSerialization.jsonObject(with:logData) as! [String:Any]
+check(logged["httpStatus"] as? Int == 503 && logged["stage"] as? String == "lightingMeter", "diagnostic record context")
+print("Native diagnostic categorization and privacy tests passed")
+
+let aliasedMeterHTML = meterHTML.replacingOccurrences(of:"地址:",with:"地哈哈址:").replacingOccurrences(of:"电价:",with:"电哈哈价:")
+check((try Electricity.meter(aliasedMeterHTML,id:"123",kind:"lighting")).value == 10, "known school electricity field aliases")
+final class MeterTestProtocol: URLProtocol {
+    static var schemes: [String] = []
+    static var secureFailure = NSURLErrorCannotConnectToHost
+    static var fixture = ""
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let url = request.url!
+        Self.schemes.append(url.scheme!)
+        if url.scheme == "https" {
+            client?.urlProtocol(self,didFailWithError:NSError(domain:NSURLErrorDomain,code:Self.secureFailure))
+        } else {
+            client?.urlProtocol(self,didReceive:HTTPURLResponse(url:url,statusCode:200,httpVersion:nil,headerFields:nil)!,cacheStoragePolicy:.notAllowed)
+            client?.urlProtocol(self,didLoad:Data(Self.fixture.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+    }
+    override func stopLoading() {}
+}
+let meterConfiguration = URLSessionConfiguration.ephemeral
+meterConfiguration.protocolClasses = [MeterTestProtocol.self]
+let meterSession = URLSession(configuration:meterConfiguration)
+MeterTestProtocol.fixture = aliasedMeterHTML
+let fallbackReading = try await Electricity.fetchMeter(id:"123",kind:"lighting",session:meterSession)
+check(MeterTestProtocol.schemes == ["https","http"], "HTTPS connection failure falls back to HTTP once")
+check(fallbackReading.value == 10 && fallbackReading.note.contains("HTTP 查询"), "HTTP fallback source shown")
+check(fallbackReading.transportDiagnostic?["code"] as? String == "CONNECTION_FAILED", "HTTPS failure preserved on success")
+MeterTestProtocol.schemes = []; MeterTestProtocol.secureFailure = NSURLErrorServerCertificateUntrusted
+do { _ = try await Electricity.fetchMeter(id:"123",kind:"lighting",session:meterSession); fatalError("TLS failure accepted") }
+catch { check(CampusDiagnostics.issue(error).code == .tls, "TLS failure preserved") }
+check(MeterTestProtocol.schemes == ["https"], "do not downgrade after certificate failures")
+meterSession.invalidateAndCancel()
+print("Native electricity fallback tests passed")

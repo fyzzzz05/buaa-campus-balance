@@ -4,7 +4,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 TEST_BINARY=$(mktemp "${TMPDIR:-/tmp}/campus-native-tests.XXXXXX")
 BRIDGE_BINARY=$(mktemp "${TMPDIR:-/tmp}/campus-native-bridge.XXXXXX")
 trap 'rm -f "$TEST_BINARY" "$BRIDGE_BINARY"' EXIT HUP INT TERM
-xcrun swiftc "$ROOT/desktop/native/CampusHistory.swift" "$ROOT/desktop/native/SchoolHTTP.swift" "$ROOT/desktop/native/SchoolHTML.swift" "$ROOT/desktop/native/SchoolClient.swift" "$ROOT/desktop/native/Electricity.swift" "$ROOT/desktop/native/LocalSettings.swift" "$ROOT/desktop/native/CardFallback.swift" "$ROOT/desktop/native/NativeDashboard.swift" "$ROOT/desktop/native/WidgetAgents.swift" "$ROOT/desktop/native/RefreshBatches.swift" "$ROOT/tests/native/main.swift" -o "$TEST_BINARY"
+xcrun swiftc "$ROOT/desktop/native/CampusHistory.swift" "$ROOT/desktop/native/Diagnostics.swift" "$ROOT/desktop/native/SchoolHTTP.swift" "$ROOT/desktop/native/SchoolHTML.swift" "$ROOT/desktop/native/SchoolClient.swift" "$ROOT/desktop/native/Electricity.swift" "$ROOT/desktop/native/LocalSettings.swift" "$ROOT/desktop/native/CardFallback.swift" "$ROOT/desktop/native/NativeDashboard.swift" "$ROOT/desktop/native/WidgetAgents.swift" "$ROOT/desktop/native/RefreshBatches.swift" "$ROOT/tests/native/main.swift" -o "$TEST_BINARY"
 "$TEST_BINARY"
 xcrun swiftc -parse-as-library "$ROOT/desktop/native/WidgetBridge.swift" -o "$BRIDGE_BINARY"
 cd "$ROOT"

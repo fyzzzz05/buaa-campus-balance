@@ -1,4 +1,5 @@
 const campus = require('../lib/campus');
+const diagnostics = require('../lib/diagnostics');
 const session = require('../lib/session');
 const credentials = require('../lib/credentials');
 const widgetAgent = require('../lib/widget-agent');
@@ -51,15 +52,7 @@ module.exports = async function handler(req, res) {
     session.write(res, current);
     return res.status(200).json({ok:true});
   } catch (err) {
-    const text = ['学校认证页面暂不可用','学校认证页面异常','学校认证服务暂不可用','登录失败，或学校要求额外验证'].includes(err.message) ? err.message : '无法连接学校认证服务，请稍后重试';
-    if (process.env.CAMPUS_APP === '1' && text === '无法连接学校认证服务，请稍后重试') {
-      try {
-        const fs = require('node:fs'), path = require('node:path'), os = require('node:os');
-        const dir = path.join(os.homedir(), 'Library', 'Logs', 'CampusBalance');
-        fs.mkdirSync(dir, {recursive:true, mode:0o700});
-        fs.appendFileSync(path.join(dir, 'auth.log'), JSON.stringify({time:new Date().toISOString(), event:'login_error', name:err.name, code:err.code || err.cause?.code || null}) + '\n', {mode:0o600});
-      } catch {}
-    }
-    return res.status(401).json({error:text});
+    const diagnostic=diagnostics.report(err,'schoolLogin');
+    return res.status(401).json({error:diagnostic.message,diagnostic});
   }
 };
