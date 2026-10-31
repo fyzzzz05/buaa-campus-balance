@@ -28,7 +28,7 @@ fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
 
 // 3) run electron-builder through node so Windows and macOS behave the same
 const cli = require.resolve('electron-builder/out/cli/cli.js');
-const result = spawnSync(process.execPath, [cli, '--win', 'nsis', '--x64', '--config', configFile], {
+const result = spawnSync(process.execPath, [cli, '--win', 'nsis', '--x64', '--publish', 'never', '--config', configFile], {
   stdio: 'inherit',
   cwd: root,
   env: {...process.env, CSC_IDENTITY_AUTO_DISCOVERY: 'false'},
