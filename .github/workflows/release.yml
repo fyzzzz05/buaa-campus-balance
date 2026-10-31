@@ -29,29 +29,10 @@ jobs:
           DEVELOPER_DIR="$(xcode-select -p)" APP_VERSION="$VERSION" ./desktop/widget/build-with-widget.sh "$RUNNER_TEMP/校园余额-v$VERSION.app"
           codesign --verify --deep --strict "$RUNNER_TEMP/校园余额-v$VERSION.app"
           test -d "$RUNNER_TEMP/校园余额-v$VERSION.app/Contents/PlugIns/CampusBalanceWidget.appex/Contents/Resources/Metadata.appintents"
-          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/校园余额-v$VERSION.app" "$RUNNER_TEMP/CampusBalance-macOS-arm64.zip"
           mkdir "$RUNNER_TEMP/dmg-content"
           cp -R "$RUNNER_TEMP/校园余额-v$VERSION.app" "$RUNNER_TEMP/dmg-content/"
           ln -s /Applications "$RUNNER_TEMP/dmg-content/Applications"
           hdiutil create -volname "校园余额 v$VERSION" -srcfolder "$RUNNER_TEMP/dmg-content" -format UDZO "$RUNNER_TEMP/CampusBalance-v$VERSION-macOS-arm64.dmg"
-      - name: Sign update and feed
-        shell: bash
-        env:
-          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-          test -n "$SPARKLE_PRIVATE_KEY"
-          VERSION="${GITHUB_REF_NAME#v}"
-          BUILD_VERSION=$(printf '%s' "$VERSION" | awk -F. '{print ($1 * 1000000) + ($2 * 1000) + $3}')
-          SPARKLE_DIR=$(sh desktop/prepare-sparkle.sh)
-          ARCHIVE="$RUNNER_TEMP/CampusBalance-macOS-arm64.zip"
-          SIGNATURE=$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_DIR/bin/sign_update" --ed-key-file - -p "$ARCHIVE")
-          SIZE=$(stat -f %z "$ARCHIVE")
-          cat > "$RUNNER_TEMP/appcast.xml" <<EOF
-          <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"><channel><title>校园余额更新</title><item><title>$VERSION</title><sparkle:version>$BUILD_VERSION</sparkle:version><sparkle:shortVersionString>$VERSION</sparkle:shortVersionString><sparkle:minimumSystemVersion>13.5</sparkle:minimumSystemVersion><enclosure url="https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/CampusBalance-macOS-arm64.zip" length="$SIZE" type="application/octet-stream" sparkle:edSignature="$SIGNATURE" /></item></channel></rss>
-          EOF
-          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_DIR/bin/sign_update" --ed-key-file - "$RUNNER_TEMP/appcast.xml"
       - name: Publish release
         shell: bash
         env:
@@ -59,5 +40,5 @@ jobs:
         run: |
           set -euo pipefail
           gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --notes "macOS Apple Silicon 原生版，包含校园余额桌面小组件（macOS 14 或更新版本），不再内置 Node.js。未使用 Apple Developer ID 签名与公证。"
-          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-macOS-arm64.zip" "$RUNNER_TEMP/appcast.xml" "$RUNNER_TEMP/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

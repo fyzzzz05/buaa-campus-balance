@@ -1,0 +1,11 @@
+# 项目约定
+
+## UI 设计
+
+Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.
+
+## 发布
+
+- 用户要求：今后发布仅上传 DMG 安装包，不上传 ZIP 等其他发布附件。
+- 发布前核实 GitHub Releases 的实际状态；本地 VERSION 不代表已经发布。2026-10-31 已确认发布前 GitHub 最新版本为 1.1.1。
+- 仅发布 DMG 时不生成 ZIP 或 appcast，按手动下载安装分发；不要宣称此发布可通过 Sparkle 自动更新。
