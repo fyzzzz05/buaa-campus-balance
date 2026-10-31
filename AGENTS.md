@@ -8,9 +8,9 @@ Avoid unnecessary secondary labels and descriptions. Let the layout do the expla
 
 ## 发布
 
-- 用户要求：今后发布仅上传 DMG 安装包，不上传 ZIP 等其他发布附件。
+- macOS 版：今后发布仅上传 DMG 安装包，不上传 ZIP 等其他发布附件；不生成 ZIP 或 appcast，按手动下载安装分发；不要宣称此发布可通过 Sparkle 自动更新。
+- Windows 版（Electron）：用户已确认可以通过 `win-v*` tag 发布安装包。只上传 `CampusBalance-vX.Y.Z-Windows-x64-setup.exe`，不要把它标成 latest（避免顶掉 macOS 的下载入口），不启用自动更新。
 - 发布前核实 GitHub Releases 的实际状态；本地 VERSION 不代表已经发布。
-- 仅发布 DMG 时不生成 ZIP 或 appcast，按手动下载安装分发；不要宣称此发布可通过 Sparkle 自动更新。
 
 ## 应用图标
 

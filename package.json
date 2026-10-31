@@ -1,15 +1,14 @@
 {
   "name": "campus-balance",
-  "version": "1.0.0",
+  "version": "1.1.4",
   "description": "个人校园余额面板",
-  "main": "index.js",
-  "directories": {
-    "lib": "lib",
-    "test": "tests"
-  },
+  "main": "electron/main.js",
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "dev": "node dev.js"
+    "test": "node --test tests/*.test.js tests/electron/*.test.js",
+    "dev": "node dev.js",
+    "electron:dev": "electron .",
+    "electron:icons": "node electron/make-icon.mjs",
+    "electron:build:win": "node electron/build.mjs"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +18,57 @@
     "cheerio": "^1.1.2",
     "csv-parse": "^7.0.3",
     "tough-cookie": "^5.1.2"
+  },
+  "devDependencies": {
+    "electron": "45.2.1",
+    "electron-builder": "26.18.0",
+    "png-to-ico": "3.0.2",
+    "sharp": "0.35.5"
+  },
+  "build": {
+    "appId": "edu.buaa.campusbalance",
+    "productName": "校园余额",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "asar": true,
+    "electronLanguages": [
+      "zh-CN",
+      "en-US"
+    ],
+    "files": [
+      "electron/**",
+      "public/**",
+      "lib/**",
+      "api/**",
+      "package.json",
+      "!**/*.test.js",
+      "build/tray-16.png",
+      "build/tray-32.png",
+      "!electron/make-icon.mjs",
+      "!electron/build.mjs",
+      "!electron/README.md"
+    ],
+    "extraMetadata": {
+      "version": "0.0.0"
+    },
+    "artifactName": "CampusBalance-v${version}-Windows-${arch}-setup.${ext}",
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

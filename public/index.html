@@ -56,8 +56,10 @@ button, a { font:inherit }
 </main>
 <script>
 const user=document.getElementById('user'),pwd=document.getElementById('pwd'),msg=document.getElementById('msg'),go=document.getElementById('go');
-if(window.__campusNative) document.getElementById('sso').href='/sso/start';
-else document.getElementById('sso').addEventListener('click',()=>{msg.className='msg info';msg.textContent='网页模式暂不支持将学校登录状态同步到应用。'});
+const sso=document.getElementById('sso');
+if(window.campusBridge&&typeof window.campusBridge.openSchoolLogin==='function'){sso.addEventListener('click',function(event){event.preventDefault();window.campusBridge.openSchoolLogin()})}
+else if(window.__campusNative) sso.href='/sso/start';
+else sso.addEventListener('click',()=>{msg.className='msg info';msg.textContent='网页模式暂不支持将学校登录状态同步到应用。'});
 document.getElementById('toggle').addEventListener('click',function(){const show=pwd.type==='password';pwd.type=show?'text':'password';this.classList.toggle('on',show);this.setAttribute('aria-label',show?'隐藏密码':'显示密码')});
 document.getElementById('login-form').addEventListener('submit',async function(e){
   e.preventDefault();if(go.disabled)return;

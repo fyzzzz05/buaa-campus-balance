@@ -3,3 +3,8 @@ node_modules/
 .env*
 !.env.example
 .vercel
+**/bin/
+**/obj/
+build/
+dist-electron/
+.DS_Store

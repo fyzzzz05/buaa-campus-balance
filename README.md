@@ -72,6 +72,25 @@ macOS 14 及以上可添加小号「校园余额」组件，点击底部图标�
 
 ## 本地开发
 
+### macOS 版开发
+
+框架结构（AppKit + WKWebView 外壳、Swift `CampusServer` 数据层、HTML 页面）、开发循环、构建/测试/发布流程见交接文档：[`docs/macos-development-handoff.md`](docs/macos-development-handoff.md)。
+
+### Windows 版（Electron）
+
+Windows 版复用同一份页面（`public/`）和 Node 数据层（`lib/`、`api/`），外壳是 Electron，代码位于 [`electron/`](electron/README.md)。包含登录、学校统一认证、四项余额与流水、电表设置、自动登录、托盘常驻、开机自启、桌面小组件和每日后台刷新。
+
+```sh
+npm ci
+npm run electron:icons   # 首次或图标 SVG 变更后
+npm run electron:dev     # 在 macOS 上也能直接开发
+npm run electron:build:win   # 产出 dist-electron/CampusBalance-vX.Y.Z-Windows-x64-setup.exe
+```
+
+Windows 安装包由 `.github/workflows/windows-electron.yml` 在 `windows-latest` 上构建：打 `win-v*` tag 时发布到对应 GitHub Release（仅 exe，不创建 appcast、不启用自动更新），手动触发时只上传 CI artifact。安装包未签名，首次运行会出现 SmartScreen 提示。
+
+之前的 C# / WinUI 3 实现已归档到本地分支 `archive/winui3`，不再参与构建。
+
 ### 查询故障排查
 
 面板会区分连接失败、请求超时、HTTPS 证书或握手失败、HTTP 错误、登录失效、流量单位无法识别、电表字段缺失及表号／类型不匹配。流水查询失败不影响已获取的余额；使用电费历史余额兜底时，实时查询失败原因保留在诊断日志中。
