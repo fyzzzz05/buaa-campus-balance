@@ -78,7 +78,7 @@ macOS 14 及以上可添加小号「校园余额」组件，点击底部图标�
 
 ### Windows 版（Electron）
 
-Windows 版复用同一份页面（`public/`）和 Node 数据层（`lib/`、`api/`），外壳是 Electron，代码位于 [`electron/`](electron/README.md)。包含登录、学校统一认证、四项余额与流水、电表设置、自动登录、托盘常驻、开机自启、桌面小组件和每日后台刷新。
+Windows 版复用同一份页面（`public/`）和 Node 数据层（`lib/`、`api/`），外壳是 Electron，代码位于 [`electron/`](electron/README.md)。包含登录、学校统一认证、四项余额与流水、电表设置、自动登录、托盘常驻、开机自启、托盘弹窗（四项余额 + 行内 14 天走势）和每日后台刷新。
 
 ```sh
 npm ci

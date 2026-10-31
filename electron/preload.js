@@ -4,14 +4,21 @@ const {contextBridge, ipcRenderer} = require('electron');
 
 contextBridge.exposeInMainWorld('campusBridge', {
   openSchoolLogin: () => ipcRenderer.invoke('campus:open-school-login'),
+  onOpenSettings: callback => {
+    ipcRenderer.on('campus:open-settings', () => callback());
+  },
 });
 
-contextBridge.exposeInMainWorld('campusWidget', {
-  getSnapshot: () => ipcRenderer.invoke('widget:get-snapshot'),
+contextBridge.exposeInMainWorld('campusPanel', {
+  getSnapshot: () => ipcRenderer.invoke('panel:get-snapshot'),
   onSnapshot: callback => {
     const handler = (_event, snapshot) => callback(snapshot);
-    ipcRenderer.on('widget:snapshot', handler);
-    return () => ipcRenderer.removeListener('widget:snapshot', handler);
+    ipcRenderer.on('panel:snapshot', handler);
+    return () => ipcRenderer.removeListener('panel:snapshot', handler);
   },
-  openMain: metric => ipcRenderer.send('widget:open', metric),
+  refresh: () => ipcRenderer.invoke('panel:refresh'),
+  resize: height => ipcRenderer.send('panel:resize', height),
+  openMain: metric => ipcRenderer.send('panel:open-main', metric),
+  openSettings: () => ipcRenderer.send('panel:open-settings'),
+  hide: () => ipcRenderer.send('panel:hide'),
 });

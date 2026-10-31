@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'">
+<title>校园余额</title>
+<style>
+  :root{
+    --fbg:rgba(248,248,250,.95); --fink:#1B1F27; --fmut:#656D7C; --fline:rgba(0,0,0,.08);
+    --facc:#2F5BEA; --fon:#FFFFFF; --fsel:rgba(47,91,234,.08); --fbtn:rgba(0,0,0,.05); --fwarn:#C2602D;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --fbg:rgba(36,40,50,.95); --fink:#F2F4F8; --fmut:#9AA4B5; --fline:rgba(255,255,255,.09);
+      --facc:#6B90FF; --fon:#0B1020; --fsel:rgba(107,144,255,.14); --fbtn:rgba(255,255,255,.07); --fwarn:#F0A070;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+  body{
+    padding:12px;
+    font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI","Noto Sans SC","PingFang SC",system-ui,sans-serif;
+    color:var(--fink);-webkit-user-select:none;user-select:none;
+  }
+  .fly{
+    width:100%;background:var(--fbg);border:1px solid var(--fline);border-radius:12px;
+    box-shadow:0 12px 40px rgba(0,0,0,.28);padding:14px 12px 12px;
+    display:flex;flex-direction:column;
+  }
+  .top{display:flex;justify-content:space-between;align-items:center;padding:0 6px 10px}
+  .top b{font-size:14px;font-weight:600;display:block}
+  .top small{font-size:12px;color:var(--fmut)}
+  .rf{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:var(--fink);display:grid;place-items:center;cursor:pointer}
+  .rf:hover{background:var(--fbtn)}
+  .rf[disabled]{opacity:.5;cursor:default}
+  .rf.spin svg{animation:spin .8s cubic-bezier(.4,0,.2,1)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .item{border-radius:10px;transition:background .25s}
+  .item.open{background:var(--fsel)}
+  .hd{width:100%;display:flex;align-items:center;gap:12px;padding:10px;border:0;border-radius:10px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+  .item:not(.open) .hd:hover{background:var(--fbtn)}
+  .hd:focus-visible,.rf:focus-visible,.fb:focus-visible{outline:2px solid var(--facc);outline-offset:2px}
+  .ic{flex:none;width:34px;height:34px;border-radius:50%;background:var(--fsel);color:var(--facc);display:grid;place-items:center;transition:background .3s,color .3s}
+  .item.open .ic{background:var(--facc);color:var(--fon)}
+  .nm{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+  .nm b{font-size:13px;font-weight:500}
+  .nm small{font-size:12px;color:var(--fmut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nm small.warn{color:var(--fwarn)}
+  .num{font-family:"Space Grotesk","DIN Alternate","Segoe UI Variable Display","Segoe UI",Arial,sans-serif;font-weight:700;font-size:20px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .num i{font-style:normal;font-size:12px;font-weight:500;color:var(--fmut);margin-left:3px;letter-spacing:0}
+  .num.warn{color:var(--fwarn)}
+  .more{display:grid;grid-template-rows:0fr;transition:grid-template-rows .35s cubic-bezier(.22,1,.36,1)}
+  .item.open .more{grid-template-rows:1fr}
+  .more>div{overflow:hidden}
+  .bars{display:flex;align-items:flex-end;gap:4px;height:56px;margin:2px 12px 0}
+  .bars i{flex:1;background:var(--facc);opacity:.45;border-radius:3px;min-height:3px;transform-origin:bottom;animation:grow .55s cubic-bezier(.22,1,.36,1) both;animation-delay:calc(var(--i) * 18ms)}
+  .bars i:last-child{opacity:1}
+  .bars i.empty{opacity:.15}
+  @keyframes grow{from{transform:scaleY(0)}}
+  .axis{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--fmut);margin:6px 12px 12px;white-space:nowrap;overflow:hidden}
+  .axis span:last-child{overflow:hidden;text-overflow:ellipsis}
+  .foot{display:flex;gap:8px;margin-top:10px;padding-top:12px;border-top:1px solid var(--fline)}
+  .fb{flex:1;font:inherit;font-size:13px;font-weight:500;color:var(--fink);background:var(--fbtn);border:0;border-radius:8px;padding:9px 10px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:filter .15s}
+  .fb:hover{filter:brightness(.95)}
+  .fb.primary{background:var(--facc);color:var(--fon)}
+  .fb svg{flex:none}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="fly" role="dialog" aria-label="校园余额">
+  <div class="top">
+    <div><b>校园余额</b><small class="when">尚未更新</small></div>
+    <button class="rf" type="button" aria-label="刷新">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+    </button>
+  </div>
+  <div class="list"></div>
+  <div class="foot">
+    <button class="fb primary" type="button" data-a="open">打开完整窗口</button>
+    <button class="fb" type="button" data-a="meter">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      电表号设置
+    </button>
+  </div>
+</div>
+<script>
+  var ICON = {
+    card:'<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/>',
+    wifi:'<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><path d="M12 20h.01"/>',
+    bulb:'<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+    snow:'<path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1"/>'
+  };
+  var METRICS = [
+    {key:'card', n:'校园卡余额', u:'元', d:2, ic:'card'},
+    {key:'network', n:'校园网流量余额', u:'GB', d:1, ic:'wifi'},
+    {key:'lighting', n:'照明电费余额', u:'元', d:2, ic:'bulb'},
+    {key:'air', n:'空调电费余额', u:'元', d:2, ic:'snow'}
+  ];
+  var snapshot = null, openIndex = 0, refreshing = false;
+  var list = document.querySelector('.list'), when = document.querySelector('.when'), refresh = document.querySelector('.rf');
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var resizeTimer = 0;
+
+  function svg(path, size) { return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>'; }
+  function item(key) { return snapshot && snapshot[key] ? snapshot[key] : null; }
+  function digits(metric) { return metric.d; }
+  function warnValue(metric, entry) {
+    if (!entry || typeof entry.value !== 'number') return false;
+    return (metric.key === 'lighting' || metric.key === 'air') && entry.value <= 10;
+  }
+  function subtitle(metric, entry) {
+    if (!snapshot) return '打开完整窗口登录后显示';
+    if (!entry || entry.value === null) return entry && entry.note ? entry.note : '暂不可用';
+    return entry.note || '暂不可用';
+  }
+  function history(entry) {
+    return entry && Array.isArray(entry.history) ? entry.history.slice(-14) : [];
+  }
+  function updateWhen() {
+    var updated = snapshot && snapshot.updatedAt ? new Date(snapshot.updatedAt) : null;
+    when.textContent = updated && Number.isFinite(updated.getTime())
+      ? '更新于 ' + ('0' + updated.getHours()).slice(-2) + ':' + ('0' + updated.getMinutes()).slice(-2)
+      : '尚未更新';
+  }
+  function bars(metric, entry) {
+    var series = history(entry);
+    if (series.length === 0) {
+      var empty = '';
+      for (var i = 0; i < 14; i += 1) empty += '<i class="empty" style="--i:' + i + ';height:8%"></i>';
+      return {html: empty, summary: '暂无历史数据', axis: ''};
+    }
+    var values = series.map(function (point) { return point && Number.isFinite(point.value) ? point.value : null; });
+    var present = values.filter(function (value) { return value !== null; });
+    var max = present.length ? Math.max.apply(null, present) : 0;
+    var sum = present.reduce(function (a, b) { return a + b; }, 0);
+    var html = values.map(function (value, index) {
+      var height = max > 0 && value !== null ? Math.max(4, value / max * 100) : 8;
+      return '<i class="' + (value === null ? 'empty' : '') + '" style="--i:' + index + ';height:' + height + '%"></i>';
+    }).join('');
+    var summary = present.length ? '日均 ' + (sum / present.length).toFixed(1) + ' · 最高 ' + max.toFixed(1) + ' ' + metric.u : '暂无历史数据';
+    var first = series[0] && series[0].date ? series[0].date.slice(5).replace('-', '/') : '';
+    var last = series[series.length - 1] && series[series.length - 1].date ? series[series.length - 1].date.slice(5).replace('-', '/') : '';
+    return {html: html, summary: summary, axis: first && last ? first + ' – ' + last : ''};
+  }
+  function render() {
+    list.innerHTML = METRICS.map(function (metric, index) {
+      var entry = item(metric.key);
+      var value = entry && typeof entry.value === 'number' ? entry.value : null;
+      var warn = warnValue(metric, entry);
+      return '<div class="item' + (index === openIndex ? ' open' : '') + '" data-k="' + index + '">' +
+        '<button class="hd" type="button" aria-expanded="' + (index === openIndex ? 'true' : 'false') + '">' +
+          '<span class="ic">' + svg(ICON[metric.ic], 18) + '</span>' +
+          '<span class="nm"><b>' + metric.n + '</b><small' + (warn ? ' class="warn"' : '') + '>' + subtitle(metric, entry) + '</small></span>' +
+          '<span class="num' + (warn ? ' warn' : '') + '">' + (value === null ? '—' : value.toFixed(digits(metric))) + '<i>' + metric.u + '</i></span>' +
+        '</button>' +
+        '<div class="more"><div><div class="bars"></div><div class="axis"><span>近 14 天</span><span></span></div></div></div></div>';
+    }).join('');
+    var open = list.querySelector('.item[data-k="' + openIndex + '"]');
+    if (open) {
+      var metric = METRICS[openIndex], entry = item(metric.key), barsData = bars(metric, entry);
+      open.querySelector('.bars').innerHTML = barsData.html;
+      var axis = open.querySelector('.axis');
+      axis.querySelector('span:last-child').textContent = barsData.summary;
+      if (barsData.axis) axis.querySelector('span:first-child').textContent = '近 14 天 · ' + barsData.axis;
+    }
+    list.querySelectorAll('.item').forEach(function (row, index) {
+      row.querySelector('.hd').addEventListener('click', function () {
+        if (openIndex === index) return;
+        openIndex = index;
+        render();
+      });
+    });
+    updateWhen();
+    if (refreshing) when.textContent = '正在刷新…';
+    scheduleResize();
+  }
+  function setSnapshot(next) {
+    snapshot = next;
+    if (refreshing) { refreshing = false; refresh.classList.remove('spin'); refresh.disabled = false; }
+    render();
+  }
+  function scheduleResize() {
+    if (!window.campusPanel || typeof window.campusPanel.resize !== 'function') return;
+    if (resizeTimer) cancelAnimationFrame(resizeTimer);
+    resizeTimer = requestAnimationFrame(function () {
+      resizeTimer = 0;
+      var panel = document.querySelector('.fly');
+      var height = Math.ceil(panel.getBoundingClientRect().height + 24);
+      window.campusPanel.resize(height);
+    });
+  }
+  function requestRefresh() {
+    if (refreshing || !window.campusPanel) return;
+    refreshing = true;
+    refresh.disabled = true;
+    refresh.classList.remove('spin');
+    if (!reduced) { void refresh.offsetWidth; refresh.classList.add('spin'); }
+    when.textContent = '正在刷新…';
+    window.campusPanel.refresh().then(function (next) {
+      if (next) setSnapshot(next);
+      else setSnapshot(snapshot);
+    }).catch(function () { refreshing = false; refresh.classList.remove('spin'); refresh.disabled = false; updateWhen(); });
+  }
+  function openMain() {
+    if (window.campusPanel) window.campusPanel.openMain(METRICS[openIndex].key);
+  }
+  function openSettings() {
+    if (window.campusPanel) window.campusPanel.openSettings();
+  }
+  list.addEventListener('keydown', function (event) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      openIndex = (openIndex + (event.key === 'ArrowDown' ? 1 : METRICS.length - 1)) % METRICS.length;
+      render();
+      var row = list.querySelector('.item[data-k="' + openIndex + '"] .hd');
+      if (row) row.focus({preventScroll: true});
+    }
+  });
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && window.campusPanel) window.campusPanel.hide();
+  });
+  refresh.addEventListener('click', requestRefresh);
+  document.querySelectorAll('.fb').forEach(function (button) {
+    button.addEventListener('click', function () { if (button.dataset.a === 'meter') openSettings(); else openMain(); });
+  });
+  render();
+  if (window.campusPanel) {
+    window.campusPanel.onSnapshot(function (next) { setSnapshot(next || null); });
+    window.campusPanel.getSnapshot().then(function (next) { setSnapshot(next || null); }).catch(function () { setSnapshot(null); });
+  }
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "campus-balance",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "个人校园余额面板",
   "main": "electron/main.js",
   "scripts": {

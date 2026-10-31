@@ -5,15 +5,15 @@ Windows 版复用 macOS 端的页面（`public/`）与 Node 数据层（`lib/`�
 ## 架构
 
 ```
-electron/main.js        主进程：本地服务、主窗口、SSO 窗口、托盘、小组件、每日刷新
+electron/main.js        主进程：本地服务、主窗口、SSO 窗口、托盘与弹窗、每日刷新
 electron/server.js      用进程内随机 secret 配置 lib/runtime，再启动共享本地服务
-electron/preload.js     向页面暴露 campusBridge，向小组件暴露 campusWidget
+electron/preload.js     向页面暴露 campusBridge，向托盘弹窗暴露 campusPanel
 electron/credentials.js safeStorage 凭据适配器（密码加密、账号提示、按账号隔离）
 electron/scheduler.js   每天 08:30 + 睡眠唤醒补刷（纯函数 + 薄封装，便于测试）
-electron/paths.js       userData/logs 路径、小组件位置裁剪
+electron/paths.js       userData/logs 路径、托盘弹窗口位置计算
 electron/navigation.js  学校域名 / 本机地址 / 外链白名单（纯函数）
-electron/widget-store.js 快照文件存写 + 小组件账号状态（替代 macOS LaunchAgent）
-electron/widget.html    170×170 置顶小窗（参考交付的 widget-2x2.html）
+electron/widget-store.js 快照文件存写 + 后台刷新账号状态（替代 macOS LaunchAgent）
+electron/tray-panel.html 托盘弹窗（360 宽，点托盘图标开关，行内展开 14 天走势）
 electron/make-icon.mjs  从 desktop/assets/campus-balance-icon.svg 生成 build/icon.ico 与托盘图标
 electron/build.mjs      注入 VERSION 后调用 electron-builder（NSIS x64）
 ```
@@ -68,7 +68,8 @@ npm run electron:build:win
 4. 设置电表号 → 刷新 → 重启后仍在。
 5. 勾选「保存密码，自动重新登录」→ 重启自动登录；取消后密码被清除。
 6. 关闭窗口进托盘；托盘菜单各项可用；重复启动只唤起已有窗口。
-7. 小组件：置顶 / 可拖动（顶部区域）/ 切换四项不打开主窗口 / 点数值区打开主窗口并选中该项 / 重启后位置恢复。
+7. 托盘弹窗：单击托盘图标在图标旁弹出/收起，点空白处或 Esc 关闭；四项余额正确，点行展开/收起 14 天走势，↑↓ 切换；
+   刷新按钮转圈并更新「更新于」；「打开完整窗口」定位到当前项；「电表号设置」弹出电表号对话框；拖到屏幕边缘或侧边任务栏后弹窗不越界。
 8. 开机自启：重启后只进托盘（`--hidden`）。
 9. 睡眠唤醒后补刷数据。
 10. 断网不崩溃，显示「更新失败」并保留旧值。

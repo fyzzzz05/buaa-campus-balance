@@ -14,12 +14,14 @@ const {startAppServer} = require('./server');
 
 const APP_ID = 'edu.buaa.campusbalance';
 const SSO_LOGIN_URL = 'https://www.cc-pay.cn/login?channel=BUAASSO';
-const WIDGET_SIZE = {width: 170, height: 170};
+const PANEL_WIDTH = 384;
+const PANEL_MIN_HEIGHT = 300;
+const PANEL_DEFAULT_HEIGHT = 432;
 const METRICS = new Set(['card', 'network', 'lighting', 'air']);
 
 let mainWindow = null;
 let ssoWindow = null;
-let widgetWindow = null;
+let panelWindow = null;
 let tray = null;
 let appServer = null;
 let appFiles = null;
@@ -29,9 +31,7 @@ let widgetAgentImpl = null;
 let scheduler = null;
 let quitting = false;
 let importingSchoolSession = false;
-let widgetVisible = false;
-let widgetUserToggled = false;
-let saveWidgetTimer = null;
+let panelBlurredAt = 0;
 
 app.setAppUserModelId(APP_ID);
 
@@ -80,15 +80,16 @@ async function bootstrap() {
 
   setupMenu();
   createMainWindow();
-  createWidgetWindow();
   createTray();
+  createTrayPanel();
   setupScheduler();
   powerMonitor.on('resume', () => { if (scheduler) scheduler.resume(); });
-  screen.on('display-metrics-changed', () => reflowWidget());
-  screen.on('display-removed', () => reflowWidget());
-  screen.on('display-added', () => reflowWidget());
+  screen.on('display-metrics-changed', () => positionTrayPanel());
+  screen.on('display-removed', () => positionTrayPanel());
+  screen.on('display-added', () => positionTrayPanel());
 
   await maybeAutoLogin();
+  if (process.argv.includes('--show-panel')) showTrayPanel();
   if (!process.argv.includes('--hidden')) await showMain();
 }
 
@@ -135,6 +136,7 @@ function createMainWindow() {
 }
 
 async function showMain(item) {
+  hideTrayPanel();
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (item && METRICS.has(item)) {
     try { await mainWindow.loadURL(appServer.server.url + 'dashboard?' + new URLSearchParams({item}).toString()); }
@@ -277,31 +279,29 @@ async function refreshNow() {
     catch (error) { diagnostics.report(error, 'refresh'); }
   }
   if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isVisible()) mainWindow.webContents.reload();
+  sendPanelSnapshot(widgetStore.read());
 }
 
-// ===================== 小组件小窗 =====================
+// ===================== 托盘弹窗（替代桌面小组件） =====================
 
-function createWidgetWindow() {
-  const saved = paths.readJson(appFiles.widgetWindow, {}) || {};
-  widgetVisible = saved.visible === true;
-  const bounds = paths.clampWindowPosition(saved, WIDGET_SIZE, workAreas());
-  widgetWindow = new BrowserWindow({
-    ...WIDGET_SIZE,
-    x: bounds.x,
-    y: bounds.y,
+function createTrayPanel() {
+  panelWindow = new BrowserWindow({
+    width: PANEL_WIDTH,
+    height: PANEL_DEFAULT_HEIGHT,
     show: false,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
     resizable: false,
-    movable: true,
+    movable: false,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
-    title: '校园余额小组件',
+    focusable: true,
+    title: '校园余额',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -309,72 +309,99 @@ function createWidgetWindow() {
       sandbox: true,
       webviewTag: false,
       spellcheck: false,
-      session: session.fromPartition('widget'),
+      session: session.fromPartition('panel'),
     },
   });
-  widgetWindow.setAlwaysOnTop(true, 'floating');
-  widgetWindow.loadFile(path.join(__dirname, 'widget.html')).catch(() => {});
-  widgetWindow.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
-  widgetWindow.webContents.on('will-navigate', event => event.preventDefault());
-  widgetWindow.webContents.once('did-finish-load', () => {
-    sendWidgetSnapshot(widgetStore.read());
-    if (widgetVisible) widgetWindow.showInactive();
+  panelWindow.setAlwaysOnTop(true, 'popup');
+  panelWindow.loadFile(path.join(__dirname, 'tray-panel.html')).catch(() => {});
+  panelWindow.webContents.setWindowOpenHandler(() => ({action: 'deny'}));
+  panelWindow.webContents.on('will-navigate', event => event.preventDefault());
+  panelWindow.webContents.once('did-finish-load', () => sendPanelSnapshot(widgetStore.read()));
+  panelWindow.on('blur', () => {
+    if (!panelWindow || panelWindow.isDestroyed()) return;
+    panelBlurredAt = Date.now();
+    hideTrayPanel();
   });
-  widgetWindow.on('move', scheduleWidgetSave);
-  widgetWindow.on('close', event => {
-    if (quitting) return;
-    event.preventDefault();
-    setWidgetVisible(false);
-  });
-  widgetWindow.on('closed', () => { widgetWindow = null; });
+  panelWindow.on('closed', () => { panelWindow = null; });
 }
 
-function workAreas() {
-  try { return screen.getAllDisplays().map(display => display.workArea); }
-  catch { return []; }
-}
-
-function reflowWidget() {
-  if (!widgetWindow || widgetWindow.isDestroyed()) return;
-  const bounds = widgetWindow.getBounds();
-  const target = paths.clampWindowPosition({x: bounds.x, y: bounds.y}, WIDGET_SIZE, workAreas());
-  if (target.x !== bounds.x || target.y !== bounds.y) widgetWindow.setPosition(target.x, target.y);
-}
-
-function scheduleWidgetSave() {
-  if (saveWidgetTimer) clearTimeout(saveWidgetTimer);
-  saveWidgetTimer = setTimeout(() => {
-    saveWidgetTimer = null;
-    if (!widgetWindow || widgetWindow.isDestroyed()) return;
-    const bounds = widgetWindow.getBounds();
-    paths.writeJson(appFiles.widgetWindow, {x: bounds.x, y: bounds.y, visible: widgetVisible});
-  }, 500);
-}
-
-function setWidgetVisible(visible) {
-  widgetVisible = visible === true;
-  widgetUserToggled = true;
-  if (!widgetWindow || widgetWindow.isDestroyed()) return;
-  if (widgetVisible) widgetWindow.showInactive(); else widgetWindow.hide();
-  if (appFiles) {
-    const bounds = widgetWindow.getBounds();
-    paths.writeJson(appFiles.widgetWindow, {x: bounds.x, y: bounds.y, visible: widgetVisible});
+function panelGeometry() {
+  let trayBounds = null;
+  if (tray && !tray.isDestroyed()) {
+    try { trayBounds = tray.getBounds(); } catch { trayBounds = null; }
   }
-  refreshTrayMenu();
+  let workArea;
+  try { workArea = trayBounds ? screen.getDisplayMatching(trayBounds).workArea : screen.getPrimaryDisplay().workArea; }
+  catch { workArea = screen.getPrimaryDisplay().workArea; }
+  return {trayBounds, workArea};
 }
 
-function onSnapshotChanged(snapshot) {
-  sendWidgetSnapshot(snapshot);
-  if (snapshot && !widgetVisible && !widgetUserToggled && widgetWindow && !widgetWindow.isDestroyed()) {
-    widgetVisible = true;
-    widgetWindow.showInactive();
-    refreshTrayMenu();
+// The panel grows when a row is expanded; keep it anchored to the tray icon.
+function resizeTrayPanel(height) {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  const {workArea} = panelGeometry();
+  const next = Math.round(Math.min(Math.max(Number(height) || PANEL_DEFAULT_HEIGHT, PANEL_MIN_HEIGHT), Math.max(PANEL_MIN_HEIGHT, workArea.height - 16)));
+  const bounds = panelWindow.getBounds();
+  if (bounds.height !== next) panelWindow.setBounds({x: bounds.x, y: bounds.y, width: PANEL_WIDTH, height: next});
+  positionTrayPanel();
+}
+
+function positionTrayPanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  const {trayBounds, workArea} = panelGeometry();
+  const bounds = panelWindow.getBounds();
+  const anchor = paths.anchorPopup({tray: trayBounds, workArea, size: {width: bounds.width, height: bounds.height}});
+  if (anchor.x !== bounds.x || anchor.y !== bounds.y) panelWindow.setPosition(anchor.x, anchor.y);
+}
+
+function showTrayPanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  sendPanelSnapshot(widgetStore.read());
+  positionTrayPanel();
+  panelWindow.show();
+  panelWindow.focus();
+}
+
+function hideTrayPanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  panelWindow.hide();
+}
+
+function toggleTrayPanel() {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  if (panelWindow.isVisible()) { hideTrayPanel(); return; }
+  // Clicking the tray icon blurs (and hides) the popup first; ignore that click.
+  if (Date.now() - panelBlurredAt < 250) return;
+  showTrayPanel();
+}
+
+function sendPanelSnapshot(snapshot) {
+  if (!panelWindow || panelWindow.isDestroyed()) return;
+  try { panelWindow.webContents.send('panel:snapshot', snapshot); } catch { /* not loaded yet */ }
+}
+
+function onSnapshotChanged(snapshot) { sendPanelSnapshot(snapshot); }
+
+async function panelRefresh() {
+  if (widgetAgentImpl.read()) {
+    try { await scheduler.refreshNow(); }
+    catch (error) { diagnostics.report(error, 'refresh'); }
+  } else if (mainWindow && !mainWindow.isDestroyed()) {
+    // Without stored credentials the logged-in window is the only data source.
+    mainWindow.webContents.reload();
   }
+  const snapshot = widgetStore.read();
+  sendPanelSnapshot(snapshot);
+  return snapshot;
 }
 
-function sendWidgetSnapshot(snapshot) {
-  if (!widgetWindow || widgetWindow.isDestroyed()) return;
-  try { widgetWindow.webContents.send('widget:snapshot', snapshot); } catch { /* not loaded yet */ }
+async function openSettingsInMain() {
+  hideTrayPanel();
+  await showMain();
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const contents = mainWindow.webContents;
+  if (contents.isLoading()) await new Promise(resolve => contents.once('did-finish-load', resolve));
+  try { contents.send('campus:open-settings'); } catch { /* window closed */ }
 }
 
 // ===================== 托盘 / 菜单 / 快捷键 =====================
@@ -393,10 +420,7 @@ function createTray() {
   tray = new Tray(trayImage());
   tray.setToolTip('校园余额');
   refreshTrayMenu();
-  tray.on('click', () => {
-    if (mainWindow && mainWindow.isVisible()) mainWindow.hide();
-    else void showMain();
-  });
+  tray.on('click', () => toggleTrayPanel());
   tray.on('double-click', () => { void showMain(); });
 }
 
@@ -405,7 +429,7 @@ function refreshTrayMenu() {
   const template = [
     {label: '打开主窗口', click: () => { void showMain(); }},
     {label: '立即刷新', click: () => { void refreshNow(); }},
-    {label: '显示小组件', type: 'checkbox', checked: widgetVisible, click: item => setWidgetVisible(item.checked)},
+    {label: '显示弹窗', click: () => showTrayPanel()},
   ];
   if (process.platform === 'win32') {
     template.push({label: '开机自启', type: 'checkbox', checked: app.getLoginItemSettings({args: ['--hidden']}).openAtLogin, click: item => {
@@ -435,6 +459,17 @@ function openExternal(url) {
 
 // ===================== IPC =====================
 
+function fromPanel(event) {
+  return Boolean(panelWindow && !panelWindow.isDestroyed() && event.sender === panelWindow.webContents);
+}
+
 ipcMain.handle('campus:open-school-login', async () => { await openSchoolLogin(); return true; });
-ipcMain.handle('widget:get-snapshot', () => (widgetStore ? widgetStore.read() : null));
-ipcMain.on('widget:open', (_event, metric) => { void showMain(typeof metric === 'string' && METRICS.has(metric) ? metric : null); });
+ipcMain.handle('panel:get-snapshot', () => (widgetStore ? widgetStore.read() : null));
+ipcMain.handle('panel:refresh', event => (fromPanel(event) ? panelRefresh() : null));
+ipcMain.on('panel:resize', (event, height) => { if (fromPanel(event)) resizeTrayPanel(height); });
+ipcMain.on('panel:open-main', (event, metric) => {
+  if (!fromPanel(event)) return;
+  void showMain(typeof metric === 'string' && METRICS.has(metric) ? metric : null);
+});
+ipcMain.on('panel:open-settings', event => { if (fromPanel(event)) void openSettingsInMain(); });
+ipcMain.on('panel:hide', event => { if (fromPanel(event)) hideTrayPanel(); });

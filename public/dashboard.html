@@ -268,4 +268,5 @@ async function refresh(){
  }));
 }
 loadMeterIndicator();refresh();
+if(window.campusBridge&&typeof window.campusBridge.onOpenSettings==='function')window.campusBridge.onOpenSettings(function(){var b=document.getElementById('dorm-open');if(b)b.click()});
 </script></body></html>

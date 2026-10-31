@@ -13,9 +13,36 @@ function files({userData, logs}) {
     accounts: path.join(userData, 'auto-login.json'),
     credentialsDir: path.join(userData, 'credentials'),
     snapshot: path.join(userData, 'widget-snapshot.json'),
-    widgetWindow: path.join(userData, 'widget-window.json'),
     widgetAccount: path.join(userData, 'widget-account.json'),
     refreshState: path.join(userData, 'refresh-state.json'),
+  };
+}
+
+// Anchors the tray popup beside the tray icon. Taskbars can sit on any edge, so
+// detect the edge from where the icon sits relative to the work area.
+function anchorPopup({tray, workArea, size}) {
+  const gap = 8;
+  const width = Math.max(1, Number(size?.width) || 0);
+  const height = Math.max(1, Number(size?.height) || 0);
+  const area = workArea && Number.isFinite(workArea.x) && Number.isFinite(workArea.y) && workArea.width > 0 && workArea.height > 0
+    ? workArea : {x: 0, y: 0, width: 1920, height: 1080};
+  const icon = tray && Number.isFinite(tray.x) && Number.isFinite(tray.y) && tray.width > 0 && tray.height > 0 ? tray : null;
+  let x, y;
+  if (icon) {
+    const topEdge = icon.y + icon.height <= area.y + 2;
+    const bottomEdge = icon.y >= area.y + area.height - 2;
+    const leftEdge = icon.x + icon.width <= area.x + 2;
+    const rightEdge = icon.x >= area.x + area.width - 2;
+    if (bottomEdge) { x = icon.x + icon.width - width; y = icon.y - height - gap; }
+    else if (topEdge) { x = icon.x + icon.width - width; y = icon.y + icon.height + gap; }
+    else if (rightEdge) { x = icon.x - width - gap; y = icon.y + icon.height / 2 - height / 2; }
+    else if (leftEdge) { x = icon.x + icon.width + gap; y = icon.y + icon.height / 2 - height / 2; }
+  }
+  if (!Number.isFinite(x)) { x = area.x + area.width - width - gap; y = area.y + area.height - height - gap; }
+  const clamp = (value, min, max) => Math.min(Math.max(value, min), Math.max(min, max));
+  return {
+    x: Math.round(clamp(x, area.x + gap, area.x + area.width - width - gap)),
+    y: Math.round(clamp(y, area.y + gap, area.y + area.height - height - gap)),
   };
 }
 
@@ -57,4 +84,4 @@ function clampWindowPosition(position, size, workAreas) {
   return {x: Math.round(x), y: Math.round(y)};
 }
 
-module.exports = {files, readJson, writeJson, removeFile, clampWindowPosition};
+module.exports = {files, readJson, writeJson, removeFile, clampWindowPosition, anchorPopup};
