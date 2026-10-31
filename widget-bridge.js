@@ -3,7 +3,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto');
 const token=fs.readFileSync(process.argv[2],'utf8').trim();
 if(!/^[0-9a-f]{64}$/.test(token))process.exit(1);
-const file=path.join(os.homedir(),'Library','Application Support','CampusBalance','widget-snapshot.json');
+const file=path.join(process.env.HOME || os.homedir(),'Library','Application Support','CampusBalance','widget-snapshot.json');
 const server=http.createServer((req,res)=>{
   const provided=Buffer.from(req.headers.authorization||''), expected=Buffer.from('Bearer '+token);
   if(req.method!=='GET'||req.url!=='/snapshot'||provided.length!==expected.length||!crypto.timingSafeEqual(provided,expected)){res.writeHead(404);return res.end()}

@@ -91,7 +91,7 @@ test('diagnostic files rotate and contain only sanitized records with private pe
   const target=path.join(directory,'diagnostics.ndjson');
   const error=new Error('account-password-cookie-secret');error.cause={code:'ECONNREFUSED'};
   diagnostics.write(diagnostics.describe(error,'electricityMeter'),directory);
-  assert.equal(fs.statSync(target).mode&0o777,0o600);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(target).mode&0o777,0o600);
   assert.equal(JSON.parse(fs.readFileSync(target,'utf8')).code,'CONNECTION_FAILED');
   assert(!fs.readFileSync(target,'utf8').includes('secret'));
   fs.appendFileSync(target,' '.repeat(262144));
