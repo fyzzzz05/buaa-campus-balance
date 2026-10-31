@@ -36,14 +36,21 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.ref_name }}"
-          if [ -f "docs/releases/$TAG.md" ]; then
-            if ! gh release view "$TAG" >/dev/null 2>&1; then
-              gh release create "$TAG" --draft --latest=false --title "校园余额 Windows ${TAG#win-}" --notes-file "docs/releases/$TAG.md"
-            fi
-          else
-            if ! gh release view "$TAG" >/dev/null 2>&1; then
-              gh release create "$TAG" --draft --latest=false --title "校园余额 Windows ${TAG#win-}" --generate-notes
+          API="repos/$GITHUB_REPOSITORY/releases"
+          # Remember the current latest release (the macOS one) before publishing.
+          PREVIOUS_LATEST="$(gh api "$API/latest" --jq .id 2>/dev/null || true)"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            if [ -f "docs/releases/$TAG.md" ]; then
+              gh release create "$TAG" --draft --title "校园余额 Windows ${TAG#win-}" --notes-file "docs/releases/$TAG.md"
+            else
+              gh release create "$TAG" --draft --title "校园余额 Windows ${TAG#win-}" --generate-notes
             fi
           fi
           gh release upload "$TAG" dist-electron/*-setup.exe --clobber
-          gh release edit "$TAG" --draft=false --latest=false
+          gh release edit "$TAG" --draft=false
+          # Windows builds must not take over the repository "latest" download entry.
+          RELEASE_ID="$(gh api "$API/tags/$TAG" --jq .id)"
+          gh api -X PATCH "$API/$RELEASE_ID" -f make_latest=false >/dev/null
+          if [ -n "$PREVIOUS_LATEST" ] && [ "$PREVIOUS_LATEST" != "$RELEASE_ID" ]; then
+            gh api -X PATCH "$API/$PREVIOUS_LATEST" -f make_latest=true >/dev/null
+          fi
