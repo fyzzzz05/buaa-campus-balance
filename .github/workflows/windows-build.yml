@@ -1,0 +1,36 @@
+name: Windows 原生版构建检查
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'windows/**'
+      - 'desktop/assets/campus-balance-icon.svg'
+      - '.github/workflows/windows-build.yml'
+permissions:
+  contents: read
+jobs:
+  core:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet run --project windows/CampusBalance.Core.Tests --configuration Release
+  winui:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        architecture: [x64, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build native app
+        shell: pwsh
+        run: ./windows/build.ps1 -Architecture ${{ matrix.architecture }}
+      # Build verification only. Release attachments remain DMG-only per AGENTS.md.

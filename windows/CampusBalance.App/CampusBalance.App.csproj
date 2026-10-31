@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <Platforms>x64;ARM64</Platforms>
+    <Platform Condition="'$(Platform)' == '' Or '$(Platform)' == 'AnyCPU'">x64</Platform>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <AssemblyName>CampusBalance</AssemblyName>
+    <RootNamespace>CampusBalance.App</RootNamespace>
+    <Version>1.1.4</Version>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260921001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
+    <ProjectReference Include="..\CampusBalance.Core\CampusBalance.Core.csproj" />
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\*.ttf" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\desktop\assets\campus-balance-icon.svg" Link="Assets\campus-balance-icon.svg" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <!--
+    未打包的 WinUI 3 应用需要 exe 同目录下的 PRI 资源索引（CampusBalance.pri）。dotnet publish
+    会把应用自己的 PRI 漏在发布目录之外（microsoft/WindowsAppSDK#6720），缺少时进程启动即出现
+    0xC000027B（Microsoft.UI.Xaml.dll 中的 stowed exception）。这里把构建阶段生成的 PRI 补进发布
+    列表；Exists 保护让它在上游修复后自动失效，不会重复复制。
+  -->
+  <Target Name="AddAppPriToResolvedFileToPublish"
+          BeforeTargets="ComputeResolvedFilesToPublishList"
+          Condition="Exists('$(ProjectPriFullPath)')">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(ProjectPriFullPath)">
+        <RelativePath>$(ProjectPriFileName)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+    <Message Importance="high" Text="发布 WinUI 资源索引：$(ProjectPriFileName)" />
+  </Target>
+</Project>

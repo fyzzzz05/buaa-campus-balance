@@ -1,0 +1,310 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    Windows 端设计 token，取值与 macOS 端 Web 界面（public/dashboard.html、public/index.html）一致。
+    浅色 / 深色两套，跟随系统或手动主题；HighContrast 复用浅色以免资源缺失。
+  -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Default">
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#ECEFF4" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SideBrush" Color="#F6F8FB" />
+      <SolidColorBrush x:Key="HoverBrush" Color="#0D18212F" />
+      <SolidColorBrush x:Key="InkBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#6A7587" />
+      <SolidColorBrush x:Key="LineBrush" Color="#DCE1E9" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#2F5BEA" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ErrorBrush" Color="#C2402D" />
+      <SolidColorBrush x:Key="TooltipBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="TooltipInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="BackdropBrush" Color="#800A0F19" />
+      <SolidColorBrush x:Key="LoginMutedBrush" Color="#657184" />
+      <SolidColorBrush x:Key="LoginLineBrush" Color="#D9DFE8" />
+      <SolidColorBrush x:Key="LoginAccentBrush" Color="#315EEA" />
+      <SolidColorBrush x:Key="LoginPrimaryBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="LoginPrimaryInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="LoginErrorBrush" Color="#BE392B" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#ECEFF4" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SideBrush" Color="#F6F8FB" />
+      <SolidColorBrush x:Key="HoverBrush" Color="#0D18212F" />
+      <SolidColorBrush x:Key="InkBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#6A7587" />
+      <SolidColorBrush x:Key="LineBrush" Color="#DCE1E9" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#2F5BEA" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ErrorBrush" Color="#C2402D" />
+      <SolidColorBrush x:Key="TooltipBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="TooltipInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="BackdropBrush" Color="#800A0F19" />
+      <SolidColorBrush x:Key="LoginMutedBrush" Color="#657184" />
+      <SolidColorBrush x:Key="LoginLineBrush" Color="#D9DFE8" />
+      <SolidColorBrush x:Key="LoginAccentBrush" Color="#315EEA" />
+      <SolidColorBrush x:Key="LoginPrimaryBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="LoginPrimaryInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="LoginErrorBrush" Color="#BE392B" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#0F141C" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#171E29" />
+      <SolidColorBrush x:Key="SideBrush" Color="#131A24" />
+      <SolidColorBrush x:Key="HoverBrush" Color="#0FEAEFF7" />
+      <SolidColorBrush x:Key="InkBrush" Color="#EAEFF7" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#8C98AC" />
+      <SolidColorBrush x:Key="LineBrush" Color="#262F3E" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#4C7BFF" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#0B1020" />
+      <SolidColorBrush x:Key="ErrorBrush" Color="#F0836F" />
+      <SolidColorBrush x:Key="TooltipBrush" Color="#EAEFF7" />
+      <SolidColorBrush x:Key="TooltipInkBrush" Color="#171E29" />
+      <SolidColorBrush x:Key="BackdropBrush" Color="#800A0F19" />
+      <SolidColorBrush x:Key="LoginMutedBrush" Color="#A5AFBF" />
+      <SolidColorBrush x:Key="LoginLineBrush" Color="#384252" />
+      <SolidColorBrush x:Key="LoginAccentBrush" Color="#557BFF" />
+      <SolidColorBrush x:Key="LoginPrimaryBrush" Color="#EEF1F6" />
+      <SolidColorBrush x:Key="LoginPrimaryInkBrush" Color="#111824" />
+      <SolidColorBrush x:Key="LoginErrorBrush" Color="#F0836F" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="HighContrast">
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#ECEFF4" />
+      <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SideBrush" Color="#F6F8FB" />
+      <SolidColorBrush x:Key="HoverBrush" Color="#0D18212F" />
+      <SolidColorBrush x:Key="InkBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="MutedBrush" Color="#6A7587" />
+      <SolidColorBrush x:Key="LineBrush" Color="#DCE1E9" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#2F5BEA" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="ErrorBrush" Color="#C2402D" />
+      <SolidColorBrush x:Key="TooltipBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="TooltipInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="BackdropBrush" Color="#800A0F19" />
+      <SolidColorBrush x:Key="LoginMutedBrush" Color="#657184" />
+      <SolidColorBrush x:Key="LoginLineBrush" Color="#D9DFE8" />
+      <SolidColorBrush x:Key="LoginAccentBrush" Color="#315EEA" />
+      <SolidColorBrush x:Key="LoginPrimaryBrush" Color="#18212F" />
+      <SolidColorBrush x:Key="LoginPrimaryInkBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="LoginErrorBrush" Color="#BE392B" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- 字体：正文用系统中文黑体；数字用随包分发的 Space Grotesk（OFL，见 Assets/Fonts/OFL.txt）。 -->
+  <FontFamily x:Key="AppFontFamily">Microsoft YaHei UI, Segoe UI, PingFang SC</FontFamily>
+  <FontFamily x:Key="NumericFont">ms-appx:///Assets/Fonts/SpaceGrotesk-Bold.ttf#Space Grotesk</FontFamily>
+  <FontFamily x:Key="NumericMediumFont">ms-appx:///Assets/Fonts/SpaceGrotesk-Medium.ttf#Space Grotesk Medium</FontFamily>
+
+
+  <!-- 正文默认字体：与 macOS 端 Web 界面的无衬线中文黑体系一致。 -->
+  <Style TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+  </Style>
+
+  <!-- 描边胶囊按钮：头部“电表号 / 退出”、登录页次要按钮、对话框“取消”。 -->
+  <Style x:Key="PillButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{ThemeResource PanelBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource LineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <ContentPresenter Padding="{TemplateBinding Padding}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Content="{TemplateBinding Content}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              FontWeight="{TemplateBinding FontWeight}"
+                              Foreground="{TemplateBinding Foreground}" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- 实心胶囊按钮：登录页“登录”、对话框“保存”；悬停由代码把 Opacity 降到 0.86。 -->
+  <Style x:Key="SolidPillButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="{ThemeResource LoginPrimaryBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource LoginPrimaryInkBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="25" />
+    <Setter Property="Padding" Value="18,0" />
+    <Setter Property="Height" Value="50" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{TemplateBinding CornerRadius}">
+            <ContentPresenter Padding="{TemplateBinding Padding}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                              Content="{TemplateBinding Content}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              FontWeight="{TemplateBinding FontWeight}"
+                              Foreground="{TemplateBinding Foreground}" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="AccentPillButtonStyle" TargetType="Button" BasedOn="{StaticResource SolidPillButtonStyle}">
+    <Setter Property="Background" Value="{ThemeResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource OnAccentBrush}" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+
+  <!-- 圆形图标按钮（更多操作）。 -->
+  <Style x:Key="GhostIconButtonStyle" TargetType="Button" BasedOn="{StaticResource PillButtonStyle}">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="16" />
+  </Style>
+
+  <!-- 登录 / 设置输入框：50 高、圆角 25、描边。 -->
+  <Style x:Key="PillTextBoxStyle" TargetType="TextBox">
+    <Setter Property="Height" Value="50" />
+    <Setter Property="Padding" Value="17,0" />
+    <Setter Property="CornerRadius" Value="25" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{ThemeResource LoginLineBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    <Setter Property="PlaceholderForeground" Value="{ThemeResource LoginMutedBrush}" />
+    <Setter Property="SelectionHighlightColor" Value="{ThemeResource AccentBrush}" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style x:Key="PillPasswordBoxStyle" TargetType="PasswordBox">
+    <Setter Property="Height" Value="50" />
+    <Setter Property="Padding" Value="17,0,52,0" />
+    <Setter Property="CornerRadius" Value="25" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{ThemeResource LoginLineBrush}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    <Setter Property="PasswordRevealMode" Value="Hidden" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+
+  <!-- 左侧余额条目按钮（选中态由背后的滑动圆角色块表示）。 -->
+  <Style x:Key="RailButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource InkBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="18,20" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+            <ContentPresenter Padding="{TemplateBinding Padding}"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Center"
+                              Content="{TemplateBinding Content}" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- 图表切换（柱状 / 折线）里的透明文字按钮。 -->
+  <Style x:Key="SegButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource MutedBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Padding" Value="14,6" />
+    <Setter Property="MinWidth" Value="64" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+            <ContentPresenter Padding="{TemplateBinding Padding}"
+                              HorizontalAlignment="Center"
+                              VerticalAlignment="Center"
+                              Content="{TemplateBinding Content}"
+                              FontFamily="{TemplateBinding FontFamily}"
+                              FontSize="{TemplateBinding FontSize}"
+                              FontWeight="{TemplateBinding FontWeight}"
+                              Foreground="{TemplateBinding Foreground}" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- 纯文字按钮（“其他设置”展开）。 -->
+  <Style x:Key="TextButtonStyle" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource MutedBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <ContentPresenter Padding="{TemplateBinding Padding}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="Center"
+                            Content="{TemplateBinding Content}"
+                            FontFamily="{TemplateBinding FontFamily}"
+                            FontSize="{TemplateBinding FontSize}"
+                            FontWeight="{TemplateBinding FontWeight}"
+                            Foreground="{TemplateBinding Foreground}" />
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>
