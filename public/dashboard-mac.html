@@ -28,9 +28,9 @@ html{height:100%}
 body{
   margin:0;min-height:100%;background:var(--bg);color:var(--ink);
   font-family:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
-  display:grid;place-items:center;padding:24px;
+  display:flex;justify-content:center;padding:24px;
 }
-.wrap{width:min(1040px,100%)}
+.wrap{width:min(1040px,100%);min-width:0;margin-block:auto}
 header{display:flex;justify-content:space-between;align-items:center;margin:0 4px 16px}
 h1{font-size:18px;font-weight:600;margin:0}
 .right{display:flex;align-items:center;gap:14px}
@@ -49,7 +49,8 @@ h1{font-size:18px;font-weight:600;margin:0}
 .ready .pill{transition:transform .55s cubic-bezier(.22,1,.36,1),width .55s cubic-bezier(.22,1,.36,1),height .55s cubic-bezier(.22,1,.36,1)}
 .item{position:relative;z-index:1;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:var(--ink);background:transparent;border:0;border-radius:14px;padding:18px 20px;cursor:pointer;transition:color .3s,background .2s}
 .item:not([aria-selected="true"]):hover{background:var(--hover)}
-.item:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.item:focus{outline:none}
+.item:focus-visible .l{text-decoration:underline;text-underline-offset:3px}
 .item .l,.item .s{font-size:13px;color:var(--muted);transition:color .3s}
 .item .s{font-size:12px}
 .item .v{font-family:"Space Grotesk","DIN Alternate","Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:34px;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
@@ -139,14 +140,13 @@ dialog::backdrop{background:rgba(10,15,25,.5)}
 
 @media (max-width:560px){.right span{display:none}}
 @media (max-width:760px){
-  .board{grid-template-columns:1fr}
-  .side{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:10px;gap:6px}
-  .item{flex:1;min-width:0;padding:12px}
-  .item .v{font-size:22px}.item .v i{font-size:11px;margin-left:3px}
-  .item .s,.hint{display:none}
-  .item .l{font-size:12px}
-  .main{padding:20px 18px 18px}
-  .chart{height:230px}
+ .board{grid-template-columns:minmax(126px,31%) minmax(0,1fr)}
+ .side{padding:8px;gap:5px}
+ .item{min-width:0;padding:14px 10px}.item .v{font-size:clamp(18px,4.5vw,28px)}
+ .item .v i{font-size:11px;margin-left:3px}.item .l{font-size:12px}
+ .item .s,.hint{display:none}.main{padding:20px 14px}.chart{height:230px}
+ .stats{gap:5px}.stat .n{font-size:16px}.stat .k{font-size:11px}
+ .seg button{min-width:48px;padding:6px 9px}
 }
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 
@@ -162,7 +162,40 @@ dialog::backdrop{background:rgba(10,15,25,.5)}
 .settings-error{font-size:12px;color:#c2402d;margin:0}.settings-error:empty{display:none}
 .extra-settings{font-size:13px;color:var(--muted)}.extra-settings summary{cursor:pointer}.extra-settings .meter-field{margin-top:14px}
 .item .s{line-height:1.4}.legend{max-height:none;overflow:visible}
-@media(max-width:460px){body{padding:12px}.side{flex-wrap:wrap}.item{flex:1 1 calc(50% - 6px)}.main{padding:20px 14px}.seg button{min-width:48px;padding-inline:9px}}
+/* Keep the rail vertical and reserve space for the chart in compact windows. */
+@media(max-width:760px){
+ .legend{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding-bottom:4px;scrollbar-width:thin}
+ .legend>*{flex:none}.chip,.legend .key{white-space:nowrap}
+}
+@media(max-width:420px){
+ body{padding:12px}.board{grid-template-columns:120px minmax(0,1fr)}
+ .main{padding:16px 10px}.mtitle h2{font-size:17px}
+}
+@media(max-width:460px){.stats{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:10px}}
+@media(max-height:760px){
+ body{padding-block:12px}
+ .wrap{display:flex;flex-direction:column;max-height:calc(100dvh - 24px)}
+ header{flex:none;margin-bottom:10px}
+ .board{flex:1 1 auto;min-height:0}
+ .side{gap:4px;padding:8px;min-height:0}
+ .item{flex:1;min-height:0;justify-content:center;gap:3px;padding:8px 14px}
+ .item .v{font-size:clamp(22px,4.3vh,30px)}
+ .item .l,.item .s{font-size:12px}
+ .hint{padding-top:4px;font-size:11px}
+ .main{min-height:0;padding:16px 22px;gap:10px}
+ .chart{flex:1 1 230px;height:230px;min-height:96px;max-height:230px}
+ .stats{flex:none;padding-top:10px}
+ .stat .n{font-size:19px}
+ .mhead,.legend{flex-shrink:0}
+}
+@media(max-width:760px) and (max-height:760px){
+ .side{padding:7px;gap:3px}.item{padding:8px 10px}
+ .main{padding:14px 12px;gap:8px}.mhead{gap:8px}
+ .item .v{font-size:clamp(18px,4.5vw,25px)}.stat .n{font-size:16px}
+ .mtitle p{font-size:12px}.native-controls.enabled{gap:8px}
+ .refresh{width:32px;height:32px}
+}
+
 @media(prefers-reduced-motion:reduce){.refresh svg{animation:none!important}}
 </style>
 </head>
@@ -272,7 +305,7 @@ function drawChart(animate=true){
  for(let j=0;j<=4;j++){const y=base-j/4*ph;node('line',{x1:PL,x2:W-PR,y1:y,y2:y},$('grid'));grid.push(node('text',{x:PL-7,y:y+4,'text-anchor':'end'},$('axis')));}
  const bars=[],dots=[],chunks=[];let chunk=[];
  points.forEach((p,i)=>{
-  const cx=PL+slot*(i+.5),label=node('text',{x:cx,y:H-6,'text-anchor':'middle'},$('axis'));label.textContent=p.date.slice(5).replace('-','/');if((points.length-1-i)%(W<460?3:2))label.style.visibility='hidden';
+  const cx=PL+slot*(i+.5),label=node('text',{x:Math.min(W-18,cx),y:H-6,'text-anchor':'middle'},$('axis'));label.textContent=p.date.slice(5).replace('-','/');if((points.length-1-i)%Math.max(2,Math.ceil(40/slot)))label.style.visibility='hidden';
   plot.push({cx,cy:null,point:p});const bw=Math.min(30,slot*.6);
   bars.push(Array.from({length:activePurposes.length||1},(_,j)=>node('rect',{class:'bar'+(activePurposes.length?' purpose':'')+(i===points.length-1?' on':''),'data-index':i,x:cx-bw/2,width:bw,rx:3,style:activePurposes[j]?'--purpose-color:'+activePurposes[j].color:''},$('gb'))));
   dots.push(node('circle',{class:'dot','data-index':i,cx,r:4.5},$('dots')));
