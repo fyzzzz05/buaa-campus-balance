@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>校园余额</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  --bg:#ECEFF4; --panel:#FFFFFF; --side:#F6F8FB; --hover:rgba(24,33,47,.05);
+  --ink:#18212F; --muted:#6A7587; --line:#DCE1E9; --accent:#2F5BEA; --on-accent:#FFFFFF;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F141C; --panel:#171E29; --side:#131A24; --hover:rgba(234,239,247,.06);
+    --ink:#EAEFF7; --muted:#8C98AC; --line:#262F3E; --accent:#4C7BFF; --on-accent:#0B1020;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F141C; --panel:#171E29; --side:#131A24; --hover:rgba(234,239,247,.06);
+  --ink:#EAEFF7; --muted:#8C98AC; --line:#262F3E; --accent:#4C7BFF; --on-accent:#0B1020;
+}
+html{height:100%}
+*{box-sizing:border-box}
+body{
+  margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  display:grid;place-items:center;padding:24px;
+}
+.wrap{width:min(1040px,100%)}
+header{display:flex;justify-content:space-between;align-items:center;margin:0 4px 16px}
+h1{font-size:18px;font-weight:600;margin:0}
+.right{display:flex;align-items:center;gap:14px}
+.right span{font-size:13px;color:var(--muted)}
+.btn{font:inherit;font-size:13px;font-weight:500;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;display:inline-block;text-decoration:none}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn:focus-visible,.seg button:focus-visible,.refresh:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dialog-actions .save{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.dialog-actions .save:hover{filter:brightness(1.08);color:var(--on-accent)}
+.meterbtn{position:relative;display:inline-flex;align-items:center;gap:6px}
+.meter-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--panel)}
+
+.board{display:grid;grid-template-columns:300px 1fr;background:var(--panel);border:1px solid var(--line);border-radius:20px;overflow:hidden;min-height:470px}
+.side{position:relative;display:flex;flex-direction:column;gap:8px;padding:14px;background:var(--side);border-right:1px solid var(--line)}
+.pill{position:absolute;left:0;top:0;width:0;height:0;border-radius:14px;background:var(--accent);z-index:0;pointer-events:none}
+.ready .pill{transition:transform .55s cubic-bezier(.22,1,.36,1),width .55s cubic-bezier(.22,1,.36,1),height .55s cubic-bezier(.22,1,.36,1)}
+.item{position:relative;z-index:1;display:flex;flex-direction:column;gap:6px;text-align:left;font:inherit;color:var(--ink);background:transparent;border:0;border-radius:14px;padding:18px 20px;cursor:pointer;transition:color .3s,background .2s}
+.item:not([aria-selected="true"]):hover{background:var(--hover)}
+.item:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.item .l,.item .s{font-size:13px;color:var(--muted);transition:color .3s}
+.item .s{font-size:12px}
+.item .v{font-family:"Space Grotesk","DIN Alternate","Helvetica Neue",Arial,sans-serif;font-weight:700;font-size:34px;line-height:1.05;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.item .v i{font-style:normal;font-size:14px;font-weight:500;margin-left:5px;letter-spacing:0;opacity:.7}
+.item[aria-selected="true"]{color:var(--on-accent)}
+.item[aria-selected="true"] .l,.item[aria-selected="true"] .s{color:var(--on-accent);opacity:.85}
+.hint{margin-top:auto;padding:10px 8px 0;font-size:12px;color:var(--muted)}
+@media (hover:none){.hint{display:none}}
+
+.main{padding:28px 32px 24px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.mhead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.mtitle h2{margin:0;font-size:20px;font-weight:600}
+.mtitle p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.swap{animation:rise .45s cubic-bezier(.22,1,.36,1)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.native-controls.enabled{display:flex;align-items:center;gap:10px}
+.refresh{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--side);color:var(--ink);display:grid;place-items:center;cursor:pointer;transition:border-color .2s,color .2s}
+.refresh:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.refresh:disabled{cursor:default;opacity:.7}
+.refresh.spin svg{animation:spin .8s cubic-bezier(.4,0,.2,1) infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.seg{position:relative;display:inline-flex;background:var(--side);border:1px solid var(--line);border-radius:999px;padding:3px}
+.seg button{position:relative;z-index:1;min-width:64px;font:inherit;font-size:13px;font-weight:500;color:var(--muted);background:transparent;border:0;border-radius:999px;padding:6px 14px;cursor:pointer;transition:color .25s}
+.seg button[aria-pressed="true"]{color:var(--on-accent)}
+.seg .thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;background:var(--accent);transition:transform .45s cubic-bezier(.22,1,.36,1)}
+.seg.line .thumb{transform:translateX(100%)}
+
+/* 余额用途图例 */
+.legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:-4px;max-height:140px;overflow:hidden;transition:opacity .3s,max-height .4s cubic-bezier(.22,1,.36,1),margin .4s}
+.legend.off{opacity:0;max-height:0;margin-top:-18px;pointer-events:none}
+.legend .lt{font-size:12px;color:var(--muted);margin-right:2px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:13px;color:var(--ink);background:var(--side);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 10px;cursor:pointer;transition:opacity .25s,border-color .2s,background .2s}
+.chip:hover{border-color:var(--muted)}
+.chip .d{width:10px;height:10px;border-radius:50%;flex:none}
+.chip em{font-style:normal;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip[aria-pressed="false"]{opacity:.45}
+.chip[aria-pressed="false"] .d{background:transparent!important;box-shadow:inset 0 0 0 2px var(--muted)}
+
+.legend .d{width:10px;height:10px;border-radius:50%;flex:none}
+.legend .key{display:inline-flex;align-items:center;gap:7px;font-size:13px;padding:5px 6px 5px 2px}
+.legend .key em{font-style:normal;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chip .go{color:var(--muted);margin-left:-1px}
+.chip.back{color:var(--muted);padding-left:12px}
+.chip.back:hover{color:var(--ink)}
+.chart{position:relative;height:280px;touch-action:pan-y;transition:opacity .3s}
+.chart.loading{opacity:.25}
+.chart svg{display:block;width:100%;height:100%}
+.grid line{stroke:var(--line);stroke-width:1}
+.axis text{font-size:11px;fill:var(--muted);font-family:inherit}
+.gb,.gl,.area{transition:opacity .4s}
+.bar{fill:var(--accent);opacity:.45;transition:opacity .15s}
+.bar.on{opacity:1}
+.stk .bar{opacity:.85;stroke:var(--panel);stroke-width:1.5}
+.stk .bar.on{opacity:1}
+.lp{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:0;transition:stroke-dashoffset .9s cubic-bezier(.22,1,.36,1)}
+.s1{stop-color:var(--accent);stop-opacity:.25}.s2{stop-color:var(--accent);stop-opacity:0}
+.area{fill:url(#ag)}
+.dot{fill:var(--panel);stroke:var(--accent);stroke-width:2;opacity:0;transition:opacity .15s}
+.dot.on{opacity:1}
+.chart:not(.line) .gl{opacity:0}
+.chart:not(.line) .lp{stroke-dashoffset:1}
+.chart.line .gb{opacity:0}
+.tip{position:absolute;pointer-events:none;transform:translate(-50%,calc(-100% - 12px));background:var(--ink);color:var(--panel);font-size:12px;line-height:1.4;padding:7px 10px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .15s,left .12s,top .12s;display:flex;flex-direction:column;gap:3px}
+.tip b{font-weight:600}
+.tip .r{display:flex;align-items:center;gap:6px}
+.tip .r i{width:8px;height:8px;border-radius:50%;flex:none}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;border-top:1px solid var(--line);padding-top:16px}
+.stat .k{font-size:12px;color:var(--muted)}
+.stat .n{font-family:"Space Grotesk","DIN Alternate","Helvetica Neue",Arial,sans-serif;font-size:22px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+.stat .n i{font-style:normal;font-size:12px;font-weight:500;margin-left:4px;color:var(--muted)}
+
+dialog{width:min(440px,calc(100% - 32px));padding:0;border:1px solid var(--line);border-radius:20px;background:var(--panel);color:var(--ink)}
+dialog[open]{animation:rise .35s cubic-bezier(.22,1,.36,1)}
+dialog::backdrop{background:rgba(10,15,25,.5)}
+.dialog-body{padding:24px 24px 20px;display:flex;flex-direction:column;gap:16px}
+.dialog-body h2{margin:0;font-size:18px;font-weight:600}
+.meter-note{display:flex;gap:10px;align-items:flex-start;background:var(--side);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.5;color:var(--muted)}
+.meter-note svg{flex:none;margin-top:2px;color:var(--accent)}
+.meter-field{display:flex;flex-direction:column;gap:8px}
+.meter-field label{font-size:14px;font-weight:500}
+.meter-field input{width:100%;font:inherit;font-size:16px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.meter-field input::placeholder{color:var(--muted)}
+.meter-field input:focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.dialog-fine{margin:0;font-size:12px;color:var(--muted)}
+.dialog-actions{display:flex;justify-content:flex-end;gap:10px}
+
+@media (max-width:560px){.right span{display:none}}
+@media (max-width:760px){
+  .board{grid-template-columns:1fr}
+  .side{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);padding:10px;gap:6px}
+  .item{flex:1;min-width:0;padding:12px}
+  .item .v{font-size:22px}.item .v i{font-size:11px;margin-left:3px}
+  .item .s,.hint{display:none}
+  .item .l{font-size:12px}
+  .main{padding:20px 18px 18px}
+  .chart{height:230px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+
+.btn[hidden],.refresh[hidden],.legend[hidden],.empty-chart[hidden]{display:none}
+#reauth{margin-top:10px}.native-controls{display:contents}
+.refresh{flex:none}.refresh[aria-busy="true"] svg{animation:spin .8s cubic-bezier(.4,0,.2,1) infinite}
+.chart{min-width:0}.empty-chart{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;pointer-events:none}
+.chip .swatch,.key .swatch,.tip .swatch{display:inline-block;width:10px;height:10px;border-radius:50%;flex:none;background:var(--purpose-color)}
+.chip .amount,.key .amount{font-style:normal;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tip .tip-row{display:flex;align-items:center;gap:6px}
+.bar.purpose{fill:var(--purpose-color);opacity:.85;stroke:var(--panel);stroke-width:1.5}
+.bar.purpose.on{opacity:1}.chart:not(.line) .gl,.chart.line .gb{pointer-events:none}
+.settings-error{font-size:12px;color:#c2402d;margin:0}.settings-error:empty{display:none}
+.extra-settings{font-size:13px;color:var(--muted)}.extra-settings summary{cursor:pointer}.extra-settings .meter-field{margin-top:14px}
+.item .s{line-height:1.4}.legend{max-height:none;overflow:visible}
+@media(max-width:460px){body{padding:12px}.side{flex-wrap:wrap}.item{flex:1 1 calc(50% - 6px)}.main{padding:20px 14px}.seg button{min-width:48px;padding-inline:9px}}
+@media(prefers-reduced-motion:reduce){.refresh svg{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header><h1>校园余额</h1><div class="right"><span id="stamp"></span><button class="btn meterbtn" id="dorm-open" type="button" aria-haspopup="dialog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>电表号<span class="meter-dot" id="meter-dot" hidden></span></button><button class="btn" id="logout" type="button">退出</button></div></header>
+<main class="board" id="board">
+<nav class="side" id="side" role="tablist" aria-orientation="vertical" aria-label="余额类别"><div class="pill" id="pill"></div><div class="hint">按 ↑ ↓ 键切换</div></nav>
+<section class="main" id="panel" role="tabpanel" tabindex="0">
+ <div class="mhead"><div class="mtitle" id="mtitle"><h2 id="ttl"></h2><p id="sub"></p><a class="btn" id="reauth" href="/" hidden>重新登录</a></div>
+ <div class="native-controls" id="native-controls"><button class="refresh" id="refresh" type="button" aria-label="刷新数据" title="刷新（R）" aria-busy="false" hidden><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button><div class="seg" id="seg" role="group" aria-label="图表类型"><span class="thumb"></span><button type="button" data-t="bar" aria-pressed="true">柱状</button><button type="button" data-t="line" aria-pressed="false">折线</button></div></div></div>
+ <div class="legend" id="legend" role="group" aria-label="余额用途" hidden></div>
+ <div class="chart" id="chart"><svg id="svg" role="img"><defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="s1"/><stop offset="1" class="s2"/></linearGradient></defs><g class="grid" id="grid"></g><g class="axis" id="axis"></g><g class="gb" id="gb"></g><g class="gl" id="gl"><g id="lines"></g><g id="dots"></g></g></svg><div class="tip" id="tip"></div><div class="empty-chart" id="empty" hidden></div></div>
+ <div class="stats"><div class="stat"><div class="k" id="sum-label">合计</div><div class="n" id="s0"></div></div><div class="stat"><div class="k">日均</div><div class="n" id="s1"></div></div><div class="stat"><div class="k">单日最高</div><div class="n" id="s2"></div></div></div>
+</section></main></div>
+<dialog id="dorm-dialog" aria-labelledby="dorm-title"><form id="dorm-form" class="dialog-body"><h2 id="dorm-title">设置电表号</h2>
+ <div class="meter-note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg><span>不知道电表号？请从北航总务公众号查询自己的电表号。</span></div>
+ <div class="meter-field"><label for="meter-lighting">照明电表号</label><input id="meter-lighting" type="text" inputmode="numeric" autocomplete="off" maxlength="30" pattern="[0-9]{1,30}" placeholder="请输入照明电表号"></div>
+ <div class="meter-field"><label for="meter-air">空调电表号</label><input id="meter-air" type="text" inputmode="numeric" autocomplete="off" maxlength="30" pattern="[0-9]{1,30}" placeholder="请输入空调电表号"></div>
+ <details class="extra-settings"><summary>其他设置</summary><div class="meter-field"><label for="dorm-name">宿舍名称</label><input id="dorm-name" maxlength="60" placeholder="如：沙河 1 号楼"></div><div class="meter-field"><label for="history-owner">电费历史 GitHub 用户名（可选）</label><input id="history-owner" maxlength="39" autocomplete="off" placeholder="用于读取自己的电费监控历史"></div></details>
+ <p class="dialog-fine">电表号按账号保存在本机。</p><p class="settings-error" id="settings-error" role="status"></p><div class="dialog-actions"><button class="btn" id="dorm-cancel" type="button">取消</button><button class="btn save" id="dorm-save" type="submit">保存</button></div></form></dialog>
+<script>
+const $=id=>document.getElementById(id), NS='http://www.w3.org/2000/svg';
+const groups=[{key:'card',name:'校园卡余额',unit:'元'},{key:'net',name:'校园网流量余额',unit:'GB'},{key:'lighting',name:'照明电费余额',unit:'元'},{key:'air',name:'空调电费余额',unit:'元'}];
+const side=$('side'),pill=$('pill'),board=$('board'),chart=$('chart'),svg=$('svg'),tip=$('tip');
+const updatedAt={};
+let data={},sel=0,points=[],plot=[],items=[],hover=-1,raf=0,mode='bar';
+const native=Boolean(window.__campusNative);
+const purposes=[{key:'food',name:'餐饮',color:'#F2A23A'},{key:'bath',name:'洗浴',color:'#28A8D8'},{key:'bus',name:'校车',color:'#9B7BF0'},{key:'shop',name:'超市',color:'#3DBE7C'},{key:'print',name:'打印等服务',color:'#C65D9E'},{key:'other',name:'其他',color:'#94A0B4'}];
+const merchantPalette=['#F2A23A','#28A8D8','#3DBE7C','#C65D9E'],otherColor='#94A0B4';
+let activePurposes=[],scope=null,scopeSources=null;
+if(native){$('refresh').hidden=false;$('native-controls').classList.add('enabled');$('side').querySelector('.hint').textContent+=' · 按 R 刷新';}
+function purposePoints(a){
+ activePurposes=[];
+ if(!native||groups[sel].key!=='card'||a.historySource!=='transactions'||!Array.isArray(a.purposeHistory)){scope=null;scopeSources=null;return null;}
+ const days=new Map(a.purposeHistory.map(p=>[p.date,p.categories]));
+ const rows=points.map(p=>({...p,categories:days.get(p.date)||{}}));
+ const totals=new Map();
+ for(const row of rows)for(const [key,value] of Object.entries(row.categories))if(Number(value)>0)totals.set(key,(totals.get(key)||0)+Number(value));
+ const list=new Map();
+ for(const [key,total] of totals){
+  const category=key.startsWith('food:')?'food':key;
+  if(scope&&(scope==='remainder'?!scopeSources?.includes(key):category!==scope))continue;
+  const id=scope?key:category,base=purposes.find(c=>c.key===category)||purposes.at(-1);
+  if(!list.has(id))list.set(id,{key:id,name:scope&&key.startsWith('food:')?key.slice(5).replace(/^沙河/,'').replace(/^北区学生第/,'北区').replace(/第([一二三四五六七八九十]+)/g,'$1'):base.name,color:base.color,total:0,sources:[]});
+  const item=list.get(id);item.total+=total;item.sources.push(key);
+ }
+ let items=[...list.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'zh-CN'));
+ if(items.length>5){const remaining=items.slice(4);items=items.slice(0,4);items.push({key:'remainder',name:'其他',color:otherColor,total:remaining.reduce((n,c)=>n+c.total,0),sources:remaining.flatMap(c=>c.sources),remainder:true});}
+ activePurposes=items.map((c,i)=>({...c,color:c.remainder?otherColor:scope?merchantPalette[i]||otherColor:c.color,drill:!scope&&c.sources.length>1}));
+ if(!activePurposes.length){if(scope){scope=null;scopeSources=null;return purposePoints(a);}return null;}
+ return rows.map(p=>{const categories=Object.fromEntries(activePurposes.map(c=>[c.key,c.sources.reduce((n,key)=>n+Number(p.categories[key]||0),0)]));return {...p,categories,value:p.value===null?null:Object.values(categories).reduce((n,v)=>n+v,0)}});
+}
+function setScope(next,sources=null){const previous=scope;scope=next;scopeSources=sources;renderPanel();const target=scope?$('legend').querySelector('button'):Array.from($('legend').querySelectorAll('button')).find(b=>b.dataset.purpose===(previous==='remainder'?'remainder':previous));target?.focus({preventScroll:true});}
+function renderLegend(){
+ const legend=$('legend');legend.replaceChildren();legend.hidden=!activePurposes.length;chart.classList.toggle('stk',activePurposes.length>0);
+ if(!activePurposes.length)return;
+ if(scope){const back=el('button','chip back','‹ 全部用途');back.type='button';back.onclick=()=>setScope(null);legend.append(back);}
+ else legend.append(el('span','lt','余额用途'));
+ for(const c of activePurposes){
+  const b=el(scope?'span':'button',scope?'key':'chip');b.dataset.purpose=c.key;b.style.setProperty('--purpose-color',c.color);
+  b.append(el('span','swatch'),el('span','',c.name),el('span','amount',fixed(c.total)));
+  if(!scope){b.type='button';b.setAttribute('aria-label',c.name+' '+fixed(c.total)+' 元，查看用途');if(c.drill)b.append(el('span','go','›'));b.onclick=()=>setScope(c.key,c.remainder?c.sources:null);}
+  legend.append(b);
+ }
+}
+const el=(tag,cls,text)=>{const x=document.createElement(tag);if(cls)x.className=cls;if(text!==undefined)x.textContent=text;return x;};
+function node(tag,attrs,parent){let x=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))x.setAttribute(k,v);parent.appendChild(x);return x;}
+function fallbackDays(){const f=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit'});const day=f.format(new Date()),base=new Date(day+'T12:00:00+08:00');return Array.from({length:14},(_,i)=>({date:f.format(new Date(base.getTime()-(13-i)*86400000)),value:null}));}
+function fixed(n){return Number(n).toFixed(2)}
+for(const [i,g] of groups.entries()){
+ const b=el('button','item');b.type='button';b.id='tab-'+g.key;b.setAttribute('role','tab');b.setAttribute('aria-controls','panel');
+ b.append(el('span','l',g.name),el('span','v','—'),el('span','s','正在查询'));b.onclick=()=>select(i,false);side.insertBefore(b,side.querySelector('.hint'));items.push(b);
+}
+function updateItems(){groups.forEach((g,i)=>{let a=data[g.key]||{status:'loading',note:'正在查询'},v=items[i].querySelector('.v');v.replaceChildren(document.createTextNode(a.status==='ok'?fixed(a.value):'—'));v.append(el('i','',g.unit));items[i].querySelector('.s').textContent=a.note||'';});}
+function movePill(){const item=items[sel];pill.style.width=item.offsetWidth+'px';pill.style.height=item.offsetHeight+'px';pill.style.transform=`translate(${item.offsetLeft}px,${item.offsetTop}px)`;}
+function select(i,focus){const next=(i+groups.length)%groups.length;if(next!==sel){scope=null;scopeSources=null;}sel=next;items.forEach((b,k)=>{b.setAttribute('aria-selected',String(k===sel));b.tabIndex=k===sel?0:-1});$('panel').setAttribute('aria-labelledby',items[sel].id);movePill();if(focus)items[sel].focus({preventScroll:true});renderPanel();}
+function textStat(id,n,unit){const e=$(id);e.replaceChildren(document.createTextNode(n===null?'—':fixed(n)));if(n!==null)e.append(el('i','',unit));}
+function renderPanel(){
+ const g=groups[sel],a=data[g.key]||{status:'loading',note:'正在查询'};$('ttl').textContent=g.name;
+ points=Array.isArray(a.history)&&a.history.length?a.history.slice(-14):fallbackDays();
+ points=purposePoints(a)||points;renderLegend();
+ const valid=points.filter(p=>p.value!==null&&Number.isFinite(p.value)&&p.value>=0);
+ const scopeName=scope==='remainder'?'其他':purposes.find(c=>c.key===scope)?.name;
+ const what=g.key==='card'?'每日消费':g.key==='net'?'每日使用':'每日用电费';
+ const time=updatedAt[g.key]?.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false});
+ $('sub').textContent=(scopeName?scopeName+' · ':'')+(a.status==='ok'&&Array.isArray(a.history)&&a.history.length?'近 14 天'+what+'（'+g.unit+'）'+(time?' · 更新于 '+time:''):a.note||'近 14 天');
+ $('reauth').hidden=a.status!=='login_required';
+ $('empty').textContent=a.status==='loading'?'正在查询':a.status!=='ok'?(a.note||'暂时无法查询'):'暂无可展示的数据';$('empty').hidden=valid.length>0;
+ const sum=valid.reduce((n,p)=>n+p.value,0);$('sum-label').textContent=valid.length===points.length?'14 天合计':'已记录合计';
+ textStat('s0',valid.length?sum:null,g.unit);textStat('s1',valid.length?sum/valid.length:null,g.unit);textStat('s2',valid.length?Math.max(...valid.map(p=>p.value)):null,g.unit);
+ const title=$('mtitle');title.classList.remove('swap');void title.offsetWidth;title.classList.add('swap');hover=-1;tip.style.opacity=0;drawChart();
+}
+function niceMax(value){if(!value)return 1;const raw=value*1.08,pow=10**Math.floor(Math.log10(raw));return ([1,2,4,8,10].find(x=>x*pow>=raw)||10)*pow;}
+let plotAnimation=0,plotFrame=null,chartSize='';
+function drawChart(animate=true){
+ cancelAnimationFrame(plotAnimation);
+ const W=chart.clientWidth,H=chart.clientHeight,PL=W<300?29:40,PR=8,PT=10,PB=26,pw=Math.max(1,W-PL-PR),ph=Math.max(1,H-PT-PB),slot=pw/points.length,base=PT+ph;
+ chartSize=W+'x'+H;
+ const valid=points.map(p=>p.value!==null&&Number.isFinite(p.value)&&p.value>=0),size=5*points.length;
+ const target=points.flatMap((p,i)=>Array.from({length:5},(_,j)=>valid[i]?(activePurposes.length?Number(p.categories[activePurposes[j]?.key]||0):j===0?p.value:0):0));
+ target.push(niceMax(Math.max(0,...points.filter((_,i)=>valid[i]).map(p=>p.value))));
+ const from=plotFrame?.length===target.length?plotFrame.slice():target.map((_,i)=>i===size?1:0);
+ const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ svg.setAttribute('viewBox',`0 0 ${W} ${H}`);for(const id of ['grid','axis','gb','lines','dots'])$(id).replaceChildren();
+ const grid=[];plot=[];
+ for(let j=0;j<=4;j++){const y=base-j/4*ph;node('line',{x1:PL,x2:W-PR,y1:y,y2:y},$('grid'));grid.push(node('text',{x:PL-7,y:y+4,'text-anchor':'end'},$('axis')));}
+ const bars=[],dots=[],chunks=[];let chunk=[];
+ points.forEach((p,i)=>{
+  const cx=PL+slot*(i+.5),label=node('text',{x:cx,y:H-6,'text-anchor':'middle'},$('axis'));label.textContent=p.date.slice(5).replace('-','/');if((points.length-1-i)%(W<460?3:2))label.style.visibility='hidden';
+  plot.push({cx,cy:null,point:p});const bw=Math.min(30,slot*.6);
+  bars.push(Array.from({length:activePurposes.length||1},(_,j)=>node('rect',{class:'bar'+(activePurposes.length?' purpose':'')+(i===points.length-1?' on':''),'data-index':i,x:cx-bw/2,width:bw,rx:3,style:activePurposes[j]?'--purpose-color:'+activePurposes[j].color:''},$('gb'))));
+  dots.push(node('circle',{class:'dot','data-index':i,cx,r:4.5},$('dots')));
+  if(valid[i])chunk.push(i);else if(chunk.length){chunks.push(chunk);chunk=[];}
+ });if(chunk.length)chunks.push(chunk);
+ const paths=chunks.map(indices=>({indices,area:node('path',{class:'area'},$('lines')),line:node('path',{class:'lp',pathLength:1},$('lines'))}));
+ function paint(frame){
+  plotFrame=frame;const max=frame[size]||1,totals=[];
+  grid.forEach((label,j)=>{const v=max*j/4;label.textContent=String(+(v.toFixed(max<10?1:0)));});
+  for(let i=0;i<points.length;i++){
+   let total=0;bars[i].forEach((bar,j)=>{const value=frame[i*5+j],height=Math.max(0,value/max*ph);bar.setAttribute('y',base-(total+value)/max*ph);bar.setAttribute('height',valid[i]?height:0);total+=value;});
+   totals.push(total);const cy=base-total/max*ph;plot[i].cy=valid[i]?cy:null;dots[i].setAttribute('cy',cy);dots[i].style.visibility=valid[i]?'visible':'hidden';
+  }
+  for(const {indices,area,line} of paths){let d='M'+plot[indices[0]].cx+','+plot[indices[0]].cy;for(let k=1;k<indices.length;k++){const a=plot[indices[k-1]],b=plot[indices[k]],mid=(a.cx+b.cx)/2;d+=` C${mid},${a.cy} ${mid},${b.cy} ${b.cx},${b.cy}`;}line.setAttribute('d',d);area.setAttribute('d',d+` L${plot[indices.at(-1)].cx},${base} L${plot[indices[0]].cx},${base} Z`);}
+  const known=totals.filter((_,i)=>valid[i]),sum=known.reduce((n,v)=>n+v,0),unit=groups[sel].unit;
+  textStat('s0',known.length?sum:null,unit);textStat('s1',known.length?sum/known.length:null,unit);textStat('s2',known.length?Math.max(...known):null,unit);
+ }
+ const start=performance.now();
+ function step(now){let done=true;const elapsed=now-start,frame=target.map((value,i)=>{const delay=i<size?Math.floor(i/5)*22:0,p=reduce||!animate?1:Math.min(1,Math.max(0,(elapsed-delay)/700));if(p<1)done=false;return from[i]+(value-from[i])*(1-(1-p)**4)});paint(frame);if(!done)plotAnimation=requestAnimationFrame(step);else plotAnimation=0;}
+ step(start);
+ svg.setAttribute('aria-label',groups[sel].name+'，'+points.map(p=>p.date+'：'+(p.value===null?'暂无数据':fixed(p.value)+' '+groups[sel].unit+(activePurposes.length?'（'+activePurposes.map(c=>c.name+' '+fixed(p.categories[c.key]||0)+' 元').join('，')+'）':''))).join('；'));
+}
+function highlight(i){svg.querySelectorAll('.bar,.dot').forEach(x=>x.classList.toggle('on',Number(x.dataset.index)===i));}
+chart.addEventListener('pointermove',e=>{const bounds=chart.getBoundingClientRect();if(!plot.length)return;const x=e.clientX-bounds.left;let i=0;for(let j=1;j<plot.length;j++)if(Math.abs(plot[j].cx-x)<Math.abs(plot[i].cx-x))i=j;const p=plot[i];hover=i;highlight(i);tip.replaceChildren(el('b','',p.point.date+'  '+(p.point.value===null?'暂无数据':fixed(p.point.value)+' '+groups[sel].unit)));if(activePurposes.length&&p.point.value!==null){for(const c of activePurposes){if(!Number(p.point.categories[c.key]))continue;const row=el('div','tip-row'),dot=el('span','swatch');dot.style.setProperty('--purpose-color',c.color);row.append(dot,document.createTextNode(c.name+' '+fixed(p.point.categories[c.key]||0)+' 元'));tip.append(row)}}const half=activePurposes.length?tip.offsetWidth/2+4:48;tip.style.left=Math.max(half,Math.min(bounds.width-half,p.cx))+'px';tip.style.top=(p.cy===null?bounds.height-26:Math.max(activePurposes.length?tip.offsetHeight+12:20,p.cy))+'px';tip.style.opacity=1;});
+chart.addEventListener('pointerleave',()=>{hover=-1;highlight(points.length-1);tip.style.opacity=0});
+$('seg').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.t;chart.classList.toggle('line',mode==='line');$('seg').classList.toggle('line',mode==='line');$('seg').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));}));
+document.addEventListener('keydown',e=>{if(e.altKey||e.ctrlKey||e.metaKey||e.target.closest('input,textarea,select,[contenteditable="true"]')||(native&&e.target.closest('dialog[open]')))return;if(native&&e.key==='Escape'&&scope){e.preventDefault();setScope(null);return}if(native&&e.key.toLowerCase()==='r'){e.preventDefault();refresh();return}if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();select(sel+(e.key==='ArrowDown'?1:-1),true)}});
+$('logout').addEventListener('click',async()=>{try{const r=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'logout'})});if(!r.ok){const v=await r.json();throw new Error(v.error||'退出失败')}location.replace('/')}catch(e){alert(e.message||'退出失败，请重试')}});
+function meterIndicator(s){$('meter-dot').hidden=Boolean(s.lighting&&s.air)}
+async function loadMeterIndicator(){try{const r=await fetch('/api/settings',{cache:'no-store'});if(r.ok)meterIndicator((await r.json()).settings)}catch{}}
+$('dorm-open').addEventListener('click',async()=>{try{const r=await fetch('/api/settings',{cache:'no-store'});if(!r.ok)throw new Error();const {settings:s}=await r.json();$('dorm-name').value=s.dorm;$('meter-lighting').value=s.lighting;$('meter-air').value=s.air;$('history-owner').value=s.historyOwner;meterIndicator(s);$('dorm-save').disabled=false;$('settings-error').textContent='';$('dorm-dialog').showModal()}catch{$('dorm-save').disabled=true;$('dorm-dialog').showModal();$('settings-error').textContent='电表设置暂不可用'}});
+$('dorm-cancel').addEventListener('click',()=>$('dorm-dialog').close());
+$('dorm-form').addEventListener('submit',async e=>{e.preventDefault();$('settings-error').textContent='';try{const r=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dorm:$('dorm-name').value,lighting:$('meter-lighting').value,air:$('meter-air').value,historyOwner:$('history-owner').value})});if(!r.ok)throw new Error();meterIndicator((await r.json()).settings);$('dorm-dialog').close();await refresh(true)}catch{$('settings-error').textContent='保存失败，请检查填写的信息'}});
+new ResizeObserver(()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{movePill();if(chartSize!==chart.clientWidth+'x'+chart.clientHeight)drawChart(false)})}).observe(board);
+const requestedMetric=new URLSearchParams(location.search).get('item');
+const initialIndex=groups.findIndex(g=>g.key===(requestedMetric==='network'?'net':requestedMetric));
+updateItems();select(initialIndex<0?0:initialIndex,false);requestAnimationFrame(()=>requestAnimationFrame(()=>board.classList.add('ready')));if(document.fonts?.ready)document.fonts.ready.then(movePill);
+let refreshGeneration=0,refreshing=false,refreshQueued=false;
+$('refresh').addEventListener('click',()=>refresh());
+async function refresh(force=false){
+ if(native&&refreshing){if(force)refreshQueued=true;return;}
+ const generation=++refreshGeneration;
+ if(native){refreshing=true;chart.classList.add('loading');$('refresh').disabled=true;$('refresh').setAttribute('aria-busy','true');}
+ try{
+ if(!window.__campusNative){try{const response=await fetch('/api/data',{cache:'no-store'});if(response.status===401){location.replace('/');return}if(!response.ok)throw new Error('fetch');data=(await response.json()).data;const now=new Date();$('stamp').textContent=data.widgetWarning||('更新于 '+(now.getMonth()+1)+' 月 '+now.getDate()+' 日');}catch{data=Object.fromEntries(groups.map(g=>[g.key,{status:'unavailable',note:'暂时无法查询'}]));$('stamp').textContent='查询失败'}updateItems();select(sel,false);return}
+ const batch=crypto.randomUUID();
+ const parts=[['card',['card']],['net',['net']],['electricity',['lighting','air']]];
+ updateItems();select(sel,false);
+ await Promise.all(parts.map(async ([part,keys])=>{
+  try{
+   const response=await fetch('/api/data/part?'+new URLSearchParams({part,batch}),{cache:'no-store'});
+   if(generation!==refreshGeneration)return;
+   if(response.status===401){location.replace('/');return}
+   if(!response.ok)throw new Error('fetch');
+   const result=await response.json();if(generation!==refreshGeneration)return;
+   Object.assign(data,result.data);const now=new Date();for(const key of keys)updatedAt[key]=now;$('stamp').textContent=result.widgetWarning||('更新于 '+(now.getMonth()+1)+' 月 '+now.getDate()+' 日');
+  }catch{if(generation!==refreshGeneration)return;for(const key of keys)data[key]={status:'unavailable',note:'暂时无法查询'};}
+  updateItems();if(keys.includes(groups[sel].key))select(sel,false);else movePill();
+ }));
+ }finally{if(native){refreshing=false;chart.classList.remove('loading');$('refresh').disabled=false;$('refresh').setAttribute('aria-busy','false');if(refreshQueued){refreshQueued=false;refresh();}}}
+}
+loadMeterIndicator();refresh();
+if(window.campusBridge&&typeof window.campusBridge.onOpenSettings==='function')window.campusBridge.onOpenSettings(function(){var b=document.getElementById('dorm-open');if(b)b.click()});
+</script></body></html>

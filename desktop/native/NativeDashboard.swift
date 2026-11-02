@@ -29,6 +29,7 @@ actor NativeDashboard {
         do {
             let history = try await client.cardHistory(user:number)
             data["history"] = encodeHistory(history.history); data["records"] = encodeRecords(history.records)
+            data["purposeHistory"] = history.purposeHistory.map { ["date": $0.date, "categories": $0.categories] as [String: Any] }
             data["historyNote"] = "校园卡消费 · 元"; data["historySource"] = "transactions"
         } catch {
             let diagnostic = CampusDiagnostics.report(error,stage:.cardHistory)

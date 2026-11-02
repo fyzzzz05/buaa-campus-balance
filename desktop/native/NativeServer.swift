@@ -69,7 +69,7 @@ actor LocalBackend {
         guard request.headers["host"] == host else { return fail("请求来源不受支持",status:403) }
         let path=String(request.target.split(separator:"?",maxSplits:1).first ?? "")
         if ["/","/index.html","/dashboard","/dashboard.html"].contains(path),request.method == "GET" {
-            let name=path.contains("dashboard") ? "dashboard.html" : "index.html"
+            let name=path.contains("dashboard") ? "dashboard-mac.html" : "index.html"
             guard let data=try? Data(contentsOf:resources.appendingPathComponent("app/public/"+name)) else { return fail("页面不可用",status:404) }
             return LocalResponse(contentType:"text/html; charset=utf-8",body:data)
         }

@@ -15,15 +15,33 @@ struct CampusRecord: Equatable {
     let value: String
 }
 
+enum CardPurpose {
+    static func classify(_ merchant: String) -> String {
+        if ["浴室", "洗浴", "淋浴"].contains(where: merchant.contains) { return "bath" }
+        if ["超市", "便利店"].contains(where: merchant.contains) { return "shop" }
+        if ["打印", "复印", "文印"].contains(where: merchant.contains) { return "print" }
+        if ["食堂", "餐厅", "餐饮"].contains(where: merchant.contains) { return "food:" + merchant }
+        if merchant.contains("车载POS") { return "bus" }
+        return "other"
+    }
+}
+
+struct CampusPurposeDay {
+    let date: String
+    let categories: [String: Double]
+}
+
 struct CampusHistoryResult {
     let history: [CampusDayValue]
     let records: [CampusRecord]
+    var purposeHistory: [CampusPurposeDay] = []
 }
 
 struct CardTradeAccumulator {
     let days: [String]
     private(set) var totals: [String: Int]
     private(set) var records: [CampusRecord] = []
+    private var purposeTotals: [String: [String: Int]] = [:]
     private(set) var received = 0
     private(set) var expected: Int?
 
@@ -47,6 +65,8 @@ struct CardTradeAccumulator {
                 guard amount != Int.min, let current = totals[day], current <= Int.max + amount else { throw CampusHistoryError.invalid }
                 totals[day] = current - amount
                 let label = String(((row["merName"] as? String) ?? (row["txName"] as? String) ?? "校园卡消费").prefix(100))
+                let purpose = CardPurpose.classify(label)
+                purposeTotals[day, default: [:]][purpose, default: 0] += -amount
                 records.append(CampusRecord(label: label, date: date, value: String(format: "¥%.2f", Double(-amount) / 100)))
             }
         }
@@ -61,7 +81,8 @@ struct CardTradeAccumulator {
     }
 
     func result() -> CampusHistoryResult {
-        CampusHistoryResult(history: days.map { CampusDayValue(date: $0, value: Double(totals[$0] ?? 0) / 100) }, records: records)
+        CampusHistoryResult(history: days.map { CampusDayValue(date: $0, value: Double(totals[$0] ?? 0) / 100) }, records: records,
+            purposeHistory: days.map { CampusPurposeDay(date: $0, categories: (purposeTotals[$0] ?? [:]).mapValues { Double($0) / 100 }) })
     }
 }
 

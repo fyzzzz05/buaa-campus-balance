@@ -13,6 +13,24 @@ let complete = try card.appendPage(["success": true, "data": ["data": [
 check(complete, "card completion")
 check(card.result().history[0].value == 19.93, "card consumption excludes top-ups")
 check(card.result().records.count == 2, "card records")
+check(card.result().purposeHistory[0].categories["food:食堂"] == 17.33, "canteen subtotal")
+check(card.result().purposeHistory[0].categories["other"] == 2.6, "unknown merchant is other")
+var categorized = CardTradeAccumulator(days: [day, "2026-10-29"])
+_ = try categorized.appendPage(["success": true, "data": ["data": [
+    ["date": day + " 12:00:00", "amount": -1400, "merName": "沙河东区第三食堂"],
+    ["date": day + " 12:30:00", "amount": -1300, "merName": "北区学生第六食堂"],
+    ["date": day + " 17:00:00", "amount": -1600, "merName": "沙河东区第三食堂"],
+    ["date": day + " 19:00:00", "amount": -1000, "merName": "车载POS"],
+    ["date": day + " 21:00:00", "amount": -61, "merName": "沙河浴室"],
+    ["date": day + " 22:00:00", "amount": 5000, "merName": "航财通转账充值"],
+    ["date": "2026-10-30 12:00:00", "amount": -100, "merName": "食堂"]
+], "count": 7]])
+let categories = categorized.result().purposeHistory[0].categories
+check(categories["food:沙河东区第三食堂"] == 30 && categories["food:北区学生第六食堂"] == 13, "canteens remain distinct and aggregate repeat purchases")
+check(categories["bus"] == 10 && categories["bath"] == 0.61, "school bus and bath merchant classification")
+check(abs(categories.values.reduce(0, +) - categorized.result().history[0].value!) < 0.000001, "purpose totals reconcile with daily spending, excluding recharge and out-of-range rows")
+check(categorized.result().purposeHistory[1].categories.isEmpty && categorized.result().history[1].value == 0, "zero-spending day preserved")
+check(CardPurpose.classify("某超市") == "shop" && CardPurpose.classify("文印中心") == "print", "other known purposes")
 var noCount = CardTradeAccumulator(days: [day])
 check((try noCount.appendPage(["success": true, "data": ["data": [["date": day + " 12:00:00", "amount": -100]], "count": 0]])), "zero count with rows")
 var incomplete = CardTradeAccumulator(days: [day])
