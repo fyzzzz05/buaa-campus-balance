@@ -34,8 +34,7 @@ final class SchoolHTTP {
     private let policy = SchoolRedirectPolicy()
     private let session: URLSession
     private let cookies: HTTPCookieStorage
-    init() {
-        let configuration = URLSessionConfiguration.ephemeral
+    init(configuration: URLSessionConfiguration = .ephemeral) {
         configuration.timeoutIntervalForRequest = 18
         configuration.timeoutIntervalForResource = 30
         configuration.httpShouldSetCookies = true
@@ -64,13 +63,20 @@ final class SchoolHTTP {
         }
     }
 
-    func request(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+    func request(_ request: URLRequest, allowLoginResponse: Bool = false) async throws -> (Data, HTTPURLResponse) {
         guard let url = request.url, SchoolRedirectPolicy.allowed(url) else { throw SchoolHTTPError.disallowedURL }
         do {
             let (data, response) = try await session.data(for: request, delegate: policy)
             guard data.count <= 3_000_000 else { throw CampusIssue(code:.responseTooLarge) }
             guard let http = response as? HTTPURLResponse, let final = http.url, SchoolRedirectPolicy.allowed(final) else { throw CampusIssue(code:.invalidResponse) }
             guard !(300...399).contains(http.statusCode) else { throw CampusIssue(code:.redirect) }
+            if allowLoginResponse, final.host?.lowercased() == "sso.buaa.edu.cn", final.path == "/login",
+               request.httpMethod?.uppercased() == "POST", [200,401].contains(http.statusCode) { return (data,http) }
+            if final.host?.lowercased() == "sso.buaa.edu.cn", final.path == "/login",
+               request.httpMethod?.uppercased() == "POST", [200, 401].contains(http.statusCode),
+               let issue = SchoolHTML.loginIssue(String(data:data,encoding:.utf8) ?? "", status:http.statusCode) {
+                throw issue
+            }
             guard http.statusCode != 401 else { throw CampusIssue(code:.loginRequired,httpStatus:401) }
             guard (200...299).contains(http.statusCode) else { throw CampusIssue(code:.http,httpStatus:http.statusCode) }
             return (data, http)

@@ -28,6 +28,7 @@ actor LocalBackend {
     private var client:NativeSchoolClient?
     private var current:NativeSchoolSession?
     private var dashboard:NativeDashboard?
+    private var loginChallenges: [String:(client:NativeSchoolClient,expires:Date)] = [:]
     private var autoLogin = false
     private var widgetWarning:String?
     private var port:UInt16 = 0
@@ -64,6 +65,11 @@ actor LocalBackend {
             catch { widgetWarning="小组件后台更新尚未启用" }
         }
     }
+    private func cacheChallenge(_ challenge:[String:Any],client:NativeSchoolClient) {
+        loginChallenges=loginChallenges.filter { $0.value.expires > Date() }
+        if loginChallenges.count >= 32, let oldest=loginChallenges.min(by:{$0.value.expires < $1.value.expires})?.key { loginChallenges.removeValue(forKey:oldest) }
+        if let id=challenge["challengeId"] as? String { loginChallenges[id]=(client,Date().addingTimeInterval(300)) }
+    }
     func respond(_ request:LocalRequest) async -> LocalResponse {
         let host="127.0.0.1:\(port)"
         guard request.headers["host"] == host else { return fail("请求来源不受支持",status:403) }
@@ -75,6 +81,19 @@ actor LocalBackend {
         }
         if let origin=request.headers["origin"],origin != "http://"+host { return fail("请求来源不受支持",status:403) }
         let body=(try? JSONSerialization.jsonObject(with:request.body)) as? [String:Any] ?? [:]
+        if path == "/api/auth/captcha" {
+            guard request.method == "POST" else { return fail("不支持此请求",status:405) }
+            if let previous=body["challengeId"] as? String { loginChallenges.removeValue(forKey:previous) }
+            let candidate=NativeSchoolClient()
+            do {
+                let challenge=try await candidate.beginLogin()
+                cacheChallenge(challenge,client:candidate)
+                return .json(challenge)
+            } catch {
+                let diagnostic=CampusDiagnostics.report(error,stage:.schoolLogin)
+                return .json(["error":diagnostic["message"] ?? "验证码加载失败","diagnostic":diagnostic],status:503)
+            }
+        }
         if path == "/api/auth" {
             if request.method == "GET" { return .json(["authenticated":authenticated(request)],status:authenticated(request) ? 200 : 401) }
             guard request.method == "POST" else { return fail("不支持此请求",status:405) }
@@ -86,7 +105,13 @@ actor LocalBackend {
                 current=nil;client=nil;dashboard=nil;autoLogin=false
                 var response=LocalResponse.json(["ok":true]);response.headers["Set-Cookie"]="campus_native_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0";return response
             }
-            let candidate=NativeSchoolClient()
+            var candidate=NativeSchoolClient()
+            if body["action"] as? String != "school-session", let id=body["challengeId"] as? String {
+                guard let pending=loginChallenges.removeValue(forKey:id),pending.expires > Date() else {
+                    return fail("验证码已过期，请刷新后重试",status:401)
+                }
+                candidate=pending.client
+            }
             let started=Date()
             do {
                 let school:NativeSchoolSession
@@ -98,7 +123,7 @@ actor LocalBackend {
                 } else {
                     guard let user=body["username"] as? String,let pass=body["password"] as? String else { return fail("请输入账号和密码",status:400) }
                     remember=body["autoLogin"] as? Bool == true;same=body["networkSamePassword"] as? Bool == true;password=pass
-                    school=try await candidate.login(user:user,password:pass,networkSamePassword:same)
+                    school=try await candidate.login(user:user,password:pass,networkSamePassword:same,captcha:body["captcha"] as? String)
                 }
                 let setupStarted=Date()
                 try prepare(school,client:candidate,remember:remember,same:same,password:password)
@@ -110,7 +135,9 @@ actor LocalBackend {
             } catch LocalSetupError.keychain { return fail("无法保存到钥匙串，请解锁钥匙串后重试",status:503)
             } catch {
                 let diagnostic = CampusDiagnostics.report(error,stage:.schoolLogin)
-                return .json(["error":diagnostic["message"] ?? "登录失败", "diagnostic":diagnostic],status:401)
+                var result:[String:Any]=["error":diagnostic["message"] ?? "登录失败", "diagnostic":diagnostic]
+                if let challenge=candidate.retryChallenge { cacheChallenge(challenge,client:candidate);result["challenge"]=challenge }
+                return .json(result,status:401)
             }
         }
         guard authenticated(request),let current,let dashboard else { return fail("请重新登录",status:401) }

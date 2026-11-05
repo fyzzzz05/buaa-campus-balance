@@ -18,6 +18,11 @@ h1 { margin:0 0 30px; text-align:center; font-size:25px; letter-spacing:.02em }
 .input input { width:100%; height:50px; padding:0 17px; border:1px solid var(--line); border-radius:25px; background:transparent; color:var(--ink); font:inherit; font-size:15px }
 .input input::placeholder { color:var(--muted) }
 #pwd { padding-right:52px }
+.captcha-row { display:grid; grid-template-columns:minmax(0,1fr) 122px; gap:12px }
+.captcha-refresh { height:50px; padding:0; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; color:#18212f; cursor:pointer }
+.captcha-refresh img { display:block; width:100%; height:100%; object-fit:contain }
+.captcha-refresh:disabled { cursor:wait; opacity:.6 }
+[hidden] { display:none !important }
 .toggle { position:absolute; top:5px; right:7px; width:40px; height:40px; display:grid; place-items:center; border:0; border-radius:50%; background:transparent; color:var(--muted); cursor:pointer }
 .toggle .off, .toggle.on .eye { display:none }
 .toggle.on .off { display:block }
@@ -47,6 +52,7 @@ button, a { font:inherit }
   <form id="login-form">
     <div class="field"><label for="user">学号 / 工号</label><div class="input"><input id="user" type="text" inputmode="numeric" autocomplete="username" placeholder="请输入学号或工号"></div></div>
     <div class="field"><label for="pwd">密码</label><div class="input"><input id="pwd" type="password" autocomplete="current-password" placeholder="请输入密码"><button class="toggle" id="toggle" type="button" aria-label="显示密码"><svg class="eye" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><svg class="off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.9 17.9A10.1 10.1 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 4.1-5.1M9.9 5.2A9.7 9.7 0 0 1 12 5c6.4 0 10 7 10 7a18.5 18.5 0 0 1-2.2 3.2"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2M2 2l20 20"/></svg></button></div></div>
+    <div class="field" id="captcha-field" hidden><label for="captcha">验证码</label><div class="captcha-row"><div class="input"><input id="captcha" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="32" placeholder="请输入验证码"></div><button class="captcha-refresh" id="captcha-refresh" type="button" aria-label="刷新验证码" title="点击刷新验证码"><img id="captcha-image" alt="学校验证码" hidden><span id="captcha-loading">重新加载</span></button></div></div>
     <div class="options"><label class="option"><input id="network-same" type="checkbox">校园网使用相同密码</label><label class="option"><input id="auto-login" type="checkbox">保存密码到本机钥匙串，自动重新登录</label></div>
     <button class="go" id="go" type="submit">登录 <span aria-hidden="true">→</span></button>
     <p class="msg" id="msg" role="status" aria-live="polite"></p>
@@ -57,6 +63,27 @@ button, a { font:inherit }
 <script>
 const user=document.getElementById('user'),pwd=document.getElementById('pwd'),msg=document.getElementById('msg'),go=document.getElementById('go');
 const sso=document.getElementById('sso');
+const captchaField=document.getElementById('captcha-field'),captcha=document.getElementById('captcha'),captchaImage=document.getElementById('captcha-image'),captchaRefresh=document.getElementById('captcha-refresh'),captchaLoading=document.getElementById('captcha-loading');
+let challenge=null,challengeLoading=false;
+function applyChallenge(value){
+  if(!value||typeof value.challengeId!=='string'||typeof value.required!=='boolean'||(value.required&&!/^data:image\/(png|jpeg|gif);base64,/.test(value.image||'')))throw new Error('验证码加载失败，请点击重试。');
+  challenge=value;captcha.value='';captchaField.hidden=!value.required;captcha.required=value.required;
+  captchaImage.hidden=!value.image;captchaLoading.hidden=!!value.image;
+  if(value.image)captchaImage.src=value.image;else captchaImage.removeAttribute('src');
+}
+async function loadChallenge(showError=true){
+  if(challengeLoading)return false;
+  challengeLoading=true;captchaRefresh.disabled=true;go.disabled=true;
+  const previous=challenge?.challengeId;challenge=null;captcha.value='';
+  try{
+    const response=await fetch('/api/auth/captcha',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challengeId:previous})});
+    const result=await response.json();if(!response.ok)throw new Error(result.error||'验证码加载失败，请点击重试。');
+    applyChallenge(result);return true;
+  }catch(error){captchaField.hidden=false;captcha.required=false;captchaImage.hidden=true;captchaImage.removeAttribute('src');captchaLoading.hidden=false;if(showError){msg.className='msg';msg.textContent=error.message||'验证码加载失败，请点击重试。'}return false}
+  finally{challengeLoading=false;captchaRefresh.disabled=false;go.disabled=false}
+}
+captchaRefresh.addEventListener('click',async()=>{msg.textContent='';await loadChallenge();captcha.focus()});
+loadChallenge();
 if(window.campusBridge&&typeof window.campusBridge.openSchoolLogin==='function'){sso.addEventListener('click',function(event){event.preventDefault();window.campusBridge.openSchoolLogin()})}
 else if(window.__campusNative) sso.href='/sso/start';
 else sso.addEventListener('click',()=>{msg.className='msg info';msg.textContent='网页模式暂不支持将学校登录状态同步到应用。'});
@@ -65,9 +92,11 @@ document.getElementById('login-form').addEventListener('submit',async function(e
   e.preventDefault();if(go.disabled)return;
   msg.className='msg';
   if(!user.value.trim()||!pwd.value){msg.textContent='请输入学号或工号，以及密码。';(user.value.trim()?pwd:user).focus();return}
-  go.disabled=true;go.textContent='登录中…';msg.textContent='';
-  try{const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value.trim(),password:pwd.value,networkSamePassword:document.getElementById('network-same').checked,autoLogin:document.getElementById('auto-login').checked})});const result=await response.json();pwd.value='';if(!response.ok){msg.textContent=result.error||'登录失败，请重试。';return}location.assign('/dashboard')}
-  catch{pwd.value='';msg.textContent='连接失败，请稍后重试。'}finally{go.disabled=false;go.innerHTML='登录 <span aria-hidden="true">→</span>'}
+  if(!challenge){await loadChallenge();return}
+  if(challenge.required&&!captcha.value.trim()){msg.textContent='请输入验证码。';captcha.focus();return}
+  go.disabled=true;captchaRefresh.disabled=true;go.textContent='登录中…';msg.textContent='';
+  try{const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:user.value.trim(),password:pwd.value,challengeId:challenge.challengeId,captcha:captcha.value.trim(),networkSamePassword:document.getElementById('network-same').checked,autoLogin:document.getElementById('auto-login').checked})});const result=await response.json();pwd.value='';if(!response.ok){msg.textContent=result.error||'登录失败，请重试。';if(result.challenge)applyChallenge(result.challenge);else await loadChallenge(false);return}location.assign('/dashboard')}
+  catch{pwd.value='';msg.textContent='连接失败，请稍后重试。';await loadChallenge(false)}finally{go.disabled=false;captchaRefresh.disabled=false;go.innerHTML='登录 <span aria-hidden="true">→</span>'}
 });
 </script>
 </body>

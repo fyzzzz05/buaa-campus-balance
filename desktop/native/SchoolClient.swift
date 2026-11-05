@@ -27,17 +27,42 @@ final class NativeSchoolClient {
         return object
     }
 
-    func login(user: String, password: String, networkSamePassword: Bool) async throws -> NativeSchoolSession {
+    private var pendingLogin: (form:SchoolLoginForm, source:URL)?
+    private(set) var retryChallenge: [String:Any]?
+
+    func beginLogin() async throws -> [String:Any] {
+        let start=try makeURL("https://www.cc-pay.cn/login",query:[URLQueryItem(name:"channel",value:"BUAASSO")])
+        let (data,response)=try await http.request(URLRequest(url:start))
+        guard let url=response.url,let html=String(data:data,encoding:.utf8) else { throw CampusIssue(code:.invalidResponse) }
+        return try await prepareChallenge(html:html,url:url)
+    }
+    private func prepareChallenge(html:String,url:URL) async throws -> [String:Any] {
+        let form=try SchoolHTML.loginForm(html,at:url)
+        var result:[String:Any]=["challengeId":UUID().uuidString,"required":form.captchaId != nil,"image":NSNull()]
+        if let id=form.captchaId {
+            let imageURL=try makeURL("https://sso.buaa.edu.cn/captcha",query:[URLQueryItem(name:"captchaId",value:id),URLQueryItem(name:"t",value:String(Int(Date().timeIntervalSince1970*1000)))])
+            let (data,response)=try await http.request(URLRequest(url:imageURL))
+            let mime=response.mimeType?.lowercased() ?? ""
+            guard ["image/png","image/jpeg","image/gif"].contains(mime), !data.isEmpty, data.count <= 512000 else { throw CampusIssue(code:.invalidResponse) }
+            result["image"]="data:\(mime);base64,"+data.base64EncodedString()
+        }
+        pendingLogin=(form,url)
+        return result
+    }
+
+    func login(user: String, password: String, networkSamePassword: Bool, captcha:String? = nil) async throws -> NativeSchoolSession {
         guard user.range(of: #"^[A-Za-z0-9][A-Za-z0-9@._-]{1,64}$"#, options: .regularExpression) != nil,
               !password.isEmpty, password.utf8.count <= 1024 else { throw NativeSchoolError.loginFailed }
         let log = Logger(subsystem:"edu.buaa.campusbalance",category:"performance")
-        let overallStart = Date()
-        let start = try makeURL("https://www.cc-pay.cn/login", query: [URLQueryItem(name: "channel", value: "BUAASSO")])
-        let (data, response) = try await http.request(URLRequest(url: start))
-        guard response.statusCode == 200, let url = response.url, let html = String(data: data, encoding: .utf8) else { throw NativeSchoolError.unavailable }
-        log.info("login form request ms=\(Int(Date().timeIntervalSince(overallStart)*1000), privacy: .public)")
-        let form = try SchoolHTML.loginForm(html, at: url)
+        retryChallenge=nil
+        if pendingLogin == nil { _ = try await beginLogin() }
+        guard let prepared=pendingLogin else { throw CampusIssue(code:.loginChallengeExpired) }
+        pendingLogin=nil
+        let form=prepared.form,url=prepared.source
+        let code=(captcha ?? "").trimmingCharacters(in:.whitespacesAndNewlines).lowercased()
+        if form.captchaId != nil, code.isEmpty || code.count > 32 { throw CampusIssue(code:.verificationRequired) }
         var fields = form.fields
+        if form.captchaId != nil { fields["captcha"]=code }
         fields["username"] = user; fields["password"] = password; fields["submit"] = "LOGIN"
         var encoded = URLComponents(); encoded.queryItems = fields.keys.sorted().map { URLQueryItem(name: $0, value: fields[$0]) }
         // URLComponents leaves '+' unescaped; application/x-www-form-urlencoded
@@ -49,7 +74,12 @@ final class NativeSchoolClient {
         login.setValue("https://sso.buaa.edu.cn", forHTTPHeaderField: "Origin")
         login.setValue(url.absoluteString, forHTTPHeaderField: "Referer")
         let submitStart = Date()
-        _ = try await http.request(login)
+        let (submission,submittedResponse) = try await http.request(login,allowLoginResponse:true)
+        if submittedResponse.url?.host == "sso.buaa.edu.cn", submittedResponse.url?.path == "/login",
+           let html=String(data:submission,encoding:.utf8), let issue=SchoolHTML.loginIssue(html,status:submittedResponse.statusCode) {
+            retryChallenge=try? await prepareChallenge(html:html,url:submittedResponse.url!)
+            throw issue
+        }
         log.info("login submission ms=\(Int(Date().timeIntervalSince(submitStart)*1000), privacy: .public)")
         let accountStart = Date()
         let account = try await json(makeURL("https://www.cc-pay.cn/api/user"))
@@ -65,7 +95,12 @@ final class NativeSchoolClient {
     func loginWithCookies(_ cookies: [[String:String]]) async throws -> NativeSchoolSession {
         try http.importSchoolCookies(cookies)
         func account() async throws -> [String:Any] { try await json(makeURL("https://www.cc-pay.cn/api/user")) }
-        var profile = try await account()
+        var profile: [String:Any]
+        do { profile = try await account() }
+        catch {
+            guard CampusDiagnostics.issue(error).code == .loginRequired else { throw error }
+            profile = [:]
+        }
         if profile["success"] as? Bool != true {
             _ = try await http.request(URLRequest(url:makeURL("https://www.cc-pay.cn/login",query:[URLQueryItem(name:"channel",value:"BUAASSO")])))
             profile = try await account()

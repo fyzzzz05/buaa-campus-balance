@@ -98,3 +98,26 @@ test('diagnostic files rotate and contain only sanitized records with private pe
   diagnostics.write(diagnostics.describe(new CampusIssue('HTTP_ERROR',{httpStatus:502}),'networkBalance'),directory);
   assert(fs.existsSync(target+'.1'));assert.equal(JSON.parse(fs.readFileSync(target,'utf8')).httpStatus,502);
 });
+
+
+test('school browser cookies initialize the payment session after an initial 401', async t => {
+  const urls=[];
+  t.mock.method(globalThis,'fetch',async url=>{
+    const address = new URL(url); urls.push(address.pathname);
+    if (urls.length === 1) return {...reply('unauthorized'),status:401};
+    if (address.pathname === '/login') return reply('<html>signed in</html>');
+    if (address.pathname === '/api/user') return reply(JSON.stringify({success:true,data:{userName:'testuser'}}));
+    if (address.pathname === '/api/campus_cards') return reply(JSON.stringify({success:true,data:[{stuNo:'testuser'}]}));
+    throw new Error('unexpected request');
+  });
+  const current = await campus.loginWithSchoolCookies([]);
+  assert.equal(current.user,'testuser');
+  assert.deepEqual(urls,['/api/user','/login','/api/user','/api/campus_cards']);
+});
+
+test('school browser session import does not retry non-authentication errors', async t => {
+  let calls=0;
+  t.mock.method(globalThis,'fetch',async()=>{calls++;return {...reply('unavailable'),status:503}});
+  await assert.rejects(campus.loginWithSchoolCookies([]),{code:'HTTP_ERROR',httpStatus:503});
+  assert.equal(calls,1);
+});

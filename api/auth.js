@@ -49,7 +49,7 @@ module.exports = async function handler(req, res) {
     return res.status(401).json({error: '账号或密码不正确'});
   }
   try {
-    const current = await campus.login(user, password, req.body?.networkSamePassword === true);
+    const current = await campus.login(user, password, req.body?.networkSamePassword === true, req.body?.challengeId ? {challengeId:req.body.challengeId,captcha:req.body.captcha} : null);
     try { await widgetAgent.disable(); await widgetSnapshot.clear(); }
     catch { return res.status(503).json({error: '小组件数据无法清除，请重试'}); }
     if (req.body?.autoLogin === true) {
@@ -64,6 +64,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ok: true});
   } catch (err) {
     const diagnostic = diagnostics.report(err, 'schoolLogin');
-    return res.status(401).json({error: diagnostic.message, diagnostic});
+    return res.status(401).json({error: diagnostic.message, diagnostic, ...(err.challenge ? {challenge:err.challenge} : {})});
   }
 };

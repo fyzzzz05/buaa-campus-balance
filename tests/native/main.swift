@@ -64,8 +64,23 @@ for unit in ["B", "byte", "BYTES"] {
 }
 do { _ = try SchoolHTML.quota("登录 免费流量剩余"); fatalError("should reject missing quota table") } catch {}
 let form = try SchoolHTML.loginForm("<form id='loginForm' action='login'><input name='execution' value='flow'><input name='type' value='username_password'></form>", at: URL(string: "https://sso.buaa.edu.cn/login")!)
+let captchaHTML = "<form id='loginForm' action='/login'><input name='execution' value='flow'><input name='captcha'></form><script>config.captcha = { id: 'school-captcha-id' };</script>"
+let captchaForm = try SchoolHTML.loginForm(captchaHTML,at:source)
+check(captchaForm.captchaId == "school-captcha-id", "parse CAS CAPTCHA config without executing scripts")
+let hiddenCaptcha = try SchoolHTML.loginForm("<form id='loginForm' action='/login'><input name='execution' value='flow'><input name='captchaId' value='hidden-captcha'></form>",at:source)
+check(hiddenCaptcha.captchaId == "hidden-captcha", "parse hidden CAPTCHA id")
+check(form.captchaId == nil, "login without CAPTCHA remains supported")
+do { _ = try SchoolHTML.loginForm("<form id='loginForm' action='/login'><input name='execution' value='flow'><input name='captcha'></form>",at:source);fatalError("missing CAPTCHA id accepted") } catch {}
 check(form.fields["execution"] == "flow", "login form")
 check(form.action.host == "sso.buaa.edu.cn", "login form host")
+check(SchoolHTML.loginIssue("<div id='errorDiv'><p>Invalid credentials: secret-account</p></div>", status:401)?.code == .credentialsRejected, "school credential rejection")
+check(SchoolHTML.loginIssue("<div id='errorDiv'><p>请输入验证码</p></div>", status:401)?.code == .verificationRequired, "school captcha requirement")
+check(SchoolHTML.loginIssue("<div id='errorDiv'><p>Account locked</p></div>", status:200)?.code == .verificationRequired, "school account lock")
+check(SchoolHTML.loginIssue("<form id='loginForm'></form>", status:200)?.code == .loginRejected, "submission returning login form")
+check(SchoolHTML.loginIssue("Unauthorized", status:401)?.code == .loginRejected, "opaque school rejection")
+check(SchoolHTML.loginIssue("<html>Welcome</html>", status:200) == nil, "successful login response")
+let rejected = CampusDiagnostics.describe(SchoolHTML.loginIssue("<div id='errorDiv'><p>Invalid credentials: secret-account</p></div>", status:401)!,stage:.schoolLogin)
+check(!String(describing:rejected).contains("secret-account"), "school errors are sanitized")
 print("Native school HTML parsing tests passed")
 let pageHTML = "<div class='summary'>第1-1条，共2条数据.</div><table><thead><tr><th>总流量</th></tr></thead><tbody><tr><td>start</td><td>2026-10-28 04:30:00(虚拟下线)</td><td>mac</td><td>ip</td><td>1,073,741,824</td><td>G</td></tr></tbody></table>"
 let parsedPage = try SchoolHTML.networkPage(pageHTML)

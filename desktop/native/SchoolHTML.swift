@@ -9,6 +9,7 @@ struct NetworkQuota: Equatable {
 struct SchoolLoginForm {
     let action: URL
     let fields: [String: String]
+    var captchaId: String? = nil
 }
 
 enum SchoolHTML {
@@ -23,12 +24,42 @@ enum SchoolHTML {
         guard let form = try document.nodes(forXPath: "//form[@id='loginForm']").first as? XMLElement else { throw CampusHistoryError.invalid }
         var fields: [String: String] = [:]
         for case let input as XMLElement in try form.nodes(forXPath: ".//input[@name]") {
-            guard let name = input.attribute(forName: "name")?.stringValue, ["execution", "_eventId", "type"].contains(name) else { continue }
+            guard let name = input.attribute(forName: "name")?.stringValue, ["execution", "_eventId", "type", "captchaId"].contains(name) else { continue }
             fields[name] = input.attribute(forName: "value")?.stringValue ?? ""
         }
         guard fields["execution"] != nil, let action = URL(string: form.attribute(forName: "action")?.stringValue ?? "", relativeTo: base)?.absoluteURL,
               SchoolRedirectPolicy.allowed(action), action.host?.lowercased() == "sso.buaa.edu.cn" else { throw CampusHistoryError.invalid }
-        return SchoolLoginForm(action: action, fields: fields)
+        var captchaId = fields["captchaId"]
+        let scripts = ((try? document.nodes(forXPath:"//script[not(@src)]")) ?? []).compactMap(\.stringValue).joined(separator:"\n")
+        let pattern = #"(?:config\.captcha\s*=|["']?captcha["']?\s*:)\s*\{\s*["']?id["']?\s*:\s*["']([A-Za-z0-9_-]{1,200})["']"#
+        if captchaId == nil, let regex = try? NSRegularExpression(pattern:pattern),
+           let match = regex.firstMatch(in:scripts,range:NSRange(scripts.startIndex...,in:scripts)),
+           let range = Range(match.range(at:1),in:scripts) { captchaId=String(scripts[range]) }
+        if captchaId == nil, let image = (try? document.nodes(forXPath:"//img[contains(@src,'/captcha?')]").first) as? XMLElement,
+           let source=image.attribute(forName:"src")?.stringValue, let url=URL(string:source,relativeTo:base),
+           let parts=URLComponents(url:url,resolvingAgainstBaseURL:true) { captchaId=parts.queryItems?.first(where:{$0.name == "captchaId"})?.value }
+        if let id=captchaId, id.range(of:#"^[A-Za-z0-9_-]{1,200}$"#,options:.regularExpression) == nil { throw CampusIssue(code:.invalidResponse) }
+        if captchaId == nil, !((try? form.nodes(forXPath:".//input[@name='captcha']")) ?? []).isEmpty { throw CampusIssue(code:.invalidResponse) }
+        return SchoolLoginForm(action:action,fields:fields,captchaId:captchaId)
+    }
+
+    // Read only the school's error element; never forward HTML, account names,
+    // execution tokens or arbitrary upstream text into UI or diagnostic logs.
+    static func loginIssue(_ html: String, status: Int) -> CampusIssue? {
+        guard let document = try? document(html) else {
+            return status == 401 ? CampusIssue(code:.loginRejected, httpStatus:status) : nil
+        }
+        let errors = (try? document.nodes(forXPath: "//*[@id='errorDiv']//p")) ?? []
+        let message = errors.compactMap(\.stringValue).joined(separator:" ").lowercased()
+        let hasForm = !((try? document.nodes(forXPath:"//form[@id='loginForm']")) ?? []).isEmpty
+        guard status == 401 || !message.trimmingCharacters(in:.whitespacesAndNewlines).isEmpty || hasForm else { return nil }
+        let code: CampusIssue.Code
+        if ["验证码", "captcha", "verification code", "二次验证", "双重验证", "额外验证", "锁定", "冻结", "locked", "disabled"].contains(where:message.contains) {
+            code = .verificationRequired
+        } else if ["密码", "password", "credential", "用户名", "账号不存在", "帐号不存在"].contains(where:message.contains) {
+            code = .credentialsRejected
+        } else { code = .loginRejected }
+        return CampusIssue(code:code, httpStatus:status == 401 ? status : nil)
     }
 
     private static func quotaValue(_ raw: String) -> Double? {
