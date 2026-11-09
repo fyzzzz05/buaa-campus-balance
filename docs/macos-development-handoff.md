@@ -361,7 +361,7 @@ npm test
 
 ### 9.2 发布流程（GitHub Actions）
 
-`.github/workflows/release.yml`：push tag `v*.*.*` 触发，`macos-14` runner：
+`.github/workflows/release.yml`：push tag `v*.*.*` 触发，`macos-15` runner：
 
 1. `npm ci` → `npm test` → `./tests/run-native.sh`
 2. `APP_VERSION=<tag 去掉 v> ./desktop/widget/build-with-widget.sh "$RUNNER_TEMP/校园余额-v$VERSION.app"`
@@ -377,6 +377,8 @@ npm test
 - `main.swift` 启动 `SPUStandardUpdaterController`，菜单「检查更新…」交给 Sparkle 处理检查、下载、安装及重启；定期检查开启，静默下载安装关闭。旧版本（截至 1.1.7）仍需手动安装一次。
 - 仓库 Secret `SPARKLE_PRIVATE_KEY` 必须与应用内的 `SUPublicEDKey` 配对；缺失时在构建前失败。`generate_appcast` 签名 DMG 和 feed，`sign_update --verify` 校验 feed，`desktop/verify-update.swift` 使用构建产物中的公钥验证 DMG，同时检查版本、下载地址和长度。验证完成后才创建 Release。私钥仅经 stdin 传入 Sparkle 工具，不写日志或附件。
 - 应用图标以 `desktop/assets/campus-balance-icon.svg` 为源，构建时生成 `.icns`；不要直接改 `.icns`。
+
+构建环境故障后可在 main 上用 `gh workflow run release.yml --ref main -f tag=vX.Y.Z` 重试已有 tag；checkout 始终指向该 tag，安装包版本必须与 tag 一致，无需改写已推送的 tag。
 
 ### 9.3 发布后自检
 
