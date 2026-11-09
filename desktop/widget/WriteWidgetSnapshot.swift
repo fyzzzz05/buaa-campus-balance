@@ -11,7 +11,7 @@ import WidgetKit
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             if object["action"] as? String == "clear" {
                 if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
-            } else {
+            } else if object["action"] as? String != "reload" {
                 guard object["updatedAt"] is String, ["card", "network", "lighting", "air"].allSatisfy({ object[$0] is [String: Any] }) else { exit(1) }
                 let previous = (try? Data(contentsOf: file)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
                 let output = try JSONSerialization.data(withJSONObject: mergeSnapshot(object, previous: previous))

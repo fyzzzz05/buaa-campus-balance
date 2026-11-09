@@ -17,7 +17,7 @@ test('widget bridge serves only authenticated local snapshot',async t=>{
  assert.equal(response.status,200);assert.deepEqual(await response.json(),{card:{value:12}});
 });
 
-test('native widget refresh authenticates, coalesces requests and reports failures without blocking snapshots',
+test('native widget refresh returns promptly, exposes activity and coalesces background requests',
  {skip:!process.env.CAMPUS_NATIVE_BRIDGE},async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'widget-refresh-bridge-'));
  const folder=path.join(dir,'Library','Application Support','CampusBalance');fs.mkdirSync(folder,{recursive:true});
@@ -25,7 +25,7 @@ test('native widget refresh authenticates, coalesces requests and reports failur
  const executable=path.join(bin,'CampusWidgetBridge');fs.copyFileSync(process.env.CAMPUS_NATIVE_BRIDGE,executable);fs.chmodSync(executable,0o700);
  const token='b'.repeat(64),tokenFile=path.join(dir,'token');fs.writeFileSync(tokenFile,token);
  const snapshot=path.join(folder,'widget-snapshot.json'),account=path.join(folder,'widget-account.json');
- fs.writeFileSync(snapshot,JSON.stringify({card:{value:12}}));
+ fs.writeFileSync(snapshot,JSON.stringify({updatedAt:new Date().toISOString(),card:{value:12}}));
  fs.writeFileSync(path.join(bin,'CampusWidgetSnapshot'),'#!/bin/sh\nexit 0\n',{mode:0o700});
  fs.writeFileSync(path.join(bin,'CampusWidgetRefresh'),`#!/usr/bin/env node
 const fs=require('node:fs'),path=require('node:path');
@@ -34,7 +34,7 @@ if(fs.realpathSync(process.env.CAMPUS_WIDGET_HELPER)!==fs.realpathSync(path.join
 fs.appendFileSync(path.join(folder,'calls'),'refresh\\n');
 setTimeout(()=>{
  if(fs.existsSync(path.join(folder,'fail')))process.exit(1);
- fs.writeFileSync(path.join(folder,'widget-snapshot.json'),JSON.stringify({card:{value:99}}));
+ fs.writeFileSync(path.join(folder,'widget-snapshot.json'),JSON.stringify({updatedAt:new Date().toISOString(),card:{value:99}}));
 },400);
 `,{mode:0o700});
  const reserve=net.createServer();await new Promise(r=>reserve.listen(0,'127.0.0.1',r));const port=reserve.address().port;await new Promise(r=>reserve.close(r));
@@ -57,15 +57,29 @@ setTimeout(()=>{
  assert.equal((await request()).status,409,'refresh needs an opted-in account');
  assert(!fs.existsSync(path.join(folder,'calls')),'rejected requests never execute the worker');
  fs.writeFileSync(account,JSON.stringify({user:'student',networkSamePassword:true}));
+ const snapshotState=async()=>await (await fetch(base+'/snapshot',{headers})).json();
+ const waitForIdle=async()=>{
+  for(let i=0;i<160;i++){
+   const state=await snapshotState();if(!state.refreshStartedAt)return state;
+   await new Promise(r=>setTimeout(r,25));
+  }
+  assert.fail('background refresh never cleared its activity state');
+ };
  const first=request(),second=request();
- // A long-running refresh must not block reading the last good snapshot.
- const during=await fetch(base+'/snapshot',{headers});assert.deepEqual(await during.json(),{card:{value:12}});
- assert.deepEqual((await Promise.all([first,second])).map(r=>r.status),[200,200]);
+ assert.deepEqual((await Promise.all([first,second])).map(r=>r.status),[202,202]);
+ // The action must end while the worker is still running, leaving other widget
+ // intents free to run. A snapshot provides the activity indicator's start time.
+ const during=await snapshotState();
+ assert.equal(during.card.value,12);
+ assert.equal(typeof during.refreshStartedAt,'string');
+ assert(Number.isFinite(Date.parse(during.refreshStartedAt)));
+ const fresh=await waitForIdle();assert.equal(fresh.card.value,99);
  assert.equal(fs.readFileSync(path.join(folder,'calls'),'utf8'),'refresh\n','overlapping clicks share one worker');
- const fresh=await fetch(base+'/snapshot',{headers});assert.deepEqual(await fresh.json(),{card:{value:99}});
  fs.writeFileSync(path.join(folder,'fail'),'1');
- assert.equal((await request()).status,503,'failed worker is not reported as success');
- const afterFailure=await fetch(base+'/snapshot',{headers});assert.deepEqual(await afterFailure.json(),{card:{value:99}});
+ assert.equal((await request()).status,202,'accepting a job is distinct from completing it');
+ const afterFailure=await waitForIdle();
+ assert.equal(afterFailure.card.value,99);assert.equal(afterFailure.refreshFailed,true);
  fs.rmSync(path.join(folder,'fail'));
- assert.equal((await request()).status,200,'refresh can recover after a worker failure');
+ assert.equal((await request()).status,202,'refresh can recover after a worker failure');
+ const recovered=await waitForIdle();assert.equal(recovered.refreshFailed,undefined);
 });

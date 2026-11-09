@@ -40,6 +40,8 @@ struct BalanceSnapshot: Codable {
     let network: BalanceValue
     let lighting: BalanceValue
     let air: BalanceValue
+    var refreshStartedAt: Date? = nil
+    var refreshFailed: Bool? = nil
 
     func metric(_ metric: BalanceMetric) -> BalanceValue {
         switch metric {
@@ -82,13 +84,13 @@ private enum WidgetStorage {
     static func refresh() async throws {
         guard let token = Bundle.main.object(forInfoDictionaryKey: "CampusWidgetToken") as? String,
               let url = URL(string: "http://127.0.0.1:49771/refresh") else { throw WidgetIntentError.refreshUnavailable }
-        var request = URLRequest(url: url, timeoutInterval: 50)
+        var request = URLRequest(url: url, timeoutInterval: 3)
         request.httpMethod = "POST"
         request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
         let (_, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode
         if status == 409 { throw WidgetIntentError.autoLoginRequired }
-        guard status == 200 else { throw WidgetIntentError.refreshUnavailable }
+        guard status == 202 || status == 200 else { throw WidgetIntentError.refreshUnavailable }
     }
 }
 
@@ -133,6 +135,10 @@ struct BalanceEntry: TimelineEntry {
     let date: Date
     let selected: BalanceMetric
     let snapshot: BalanceSnapshot?
+    var refreshInterval: ClosedRange<Date>? {
+        guard let start = snapshot?.refreshStartedAt, date < start.addingTimeInterval(46) else { return nil }
+        return start...start.addingTimeInterval(46)
+    }
 }
 
 struct BalanceProvider: TimelineProvider {
@@ -146,7 +152,14 @@ struct BalanceProvider: TimelineProvider {
         WidgetStorage.snapshot { snapshot in
             let now = Date()
             let entry = BalanceEntry(date: now, selected: WidgetStorage.selected(), snapshot: snapshot)
-            completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(6 * 60 * 60))))
+            if let interval = entry.refreshInterval {
+                // If the bridge crashes, expire the busy UI without relying on
+                // another network response or frequent timeline polling.
+                let expiry = BalanceEntry(date: interval.upperBound, selected: entry.selected, snapshot: snapshot)
+                completion(Timeline(entries: [entry, expiry], policy: .after(interval.upperBound)))
+            } else {
+                completion(Timeline(entries: [entry], policy: .after(now.addingTimeInterval(6 * 60 * 60))))
+            }
         }
     }
 }
@@ -168,7 +181,7 @@ struct BalanceWidgetView: View {
     private var subtitle: String {
         guard let snapshot=entry.snapshot else { return "打开 App 更新数据" }
         let updated=balance?.updatedAt ?? snapshot.updatedAt
-        if balance?.note == "更新失败" || entry.date.timeIntervalSince(updated)>26*60*60 {
+        if balance?.note == "更新失败" || entry.snapshot?.refreshFailed == true || entry.date.timeIntervalSince(updated)>26*60*60 {
             return "上次更新 " + updated.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits))
         }
         if warning { return "余额偏低" }
@@ -181,9 +194,17 @@ struct BalanceWidgetView: View {
                 Text(metric.title).font(.system(size: 12, weight: .medium)).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.75)
                 Spacer(minLength: 0)
                 Button(intent: RefreshBalanceIntent()) {
-                    Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(muted).frame(width: 24, height: 24).contentShape(Rectangle())
-                }.buttonStyle(.plain).accessibilityLabel("刷新余额")
+                    Group {
+                        if let interval = entry.refreshInterval {
+                            ProgressView(timerInterval: interval, countsDown: false)
+                                .progressViewStyle(.circular).labelsHidden().tint(muted)
+                                .frame(width: 12, height: 12)
+                        } else {
+                            Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .medium))
+                        }
+                    }.foregroundStyle(muted).frame(width: 24, height: 24).contentShape(Rectangle())
+                }.buttonStyle(.plain).disabled(entry.refreshInterval != nil)
+                    .accessibilityLabel(entry.refreshInterval == nil ? "刷新余额" : "正在刷新余额")
             }.frame(height: 16)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(balance?.value.map { $0.formatted(.number.precision(.fractionLength(metric == .network ? 1 : 2))) } ?? "—")

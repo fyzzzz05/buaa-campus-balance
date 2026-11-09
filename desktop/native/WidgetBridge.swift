@@ -8,21 +8,22 @@ private final class WidgetRefresher {
     let resources: URL
     let home: URL
     private var process: Process?
-    private var waiting: [(String) -> Void] = []
+    private(set) var startedAt: Date?
+    private var failedAt: Date?
     private var timeout: DispatchWorkItem?
 
     init(queue: DispatchQueue, resources: URL, home: URL) {
         self.queue = queue; self.resources = resources; self.home = home
     }
 
-    func refresh(_ completion: @escaping (String) -> Void) {
-        if process != nil { waiting.append(completion); return }
+    func refresh() -> String {
+        if process != nil { return "202 Accepted" }
         let account = home.appendingPathComponent("Library/Application Support/CampusBalance/widget-account.json")
-        guard FileManager.default.fileExists(atPath: account.path) else { completion("409 Conflict"); return }
+        guard FileManager.default.fileExists(atPath: account.path) else { return "409 Conflict" }
         let worker = resources.appendingPathComponent("CampusWidgetRefresh")
         let helper = resources.appendingPathComponent("CampusWidgetSnapshot")
         guard FileManager.default.isExecutableFile(atPath: worker.path), FileManager.default.isExecutableFile(atPath: helper.path) else {
-            completion("503 Service Unavailable"); return
+            return "503 Service Unavailable"
         }
         let child = Process()
         child.executableURL = worker
@@ -36,9 +37,9 @@ private final class WidgetRefresher {
             guard let self else { return }
             self.queue.async { self.finish(finished, status: finished.terminationStatus == 0 ? "200 OK" : "503 Service Unavailable") }
         }
-        process = child; waiting = [completion]
+        process = child; startedAt = Date(); failedAt = nil
         do { try child.run() }
-        catch { finish(child, status: "503 Service Unavailable"); return }
+        catch { finish(child, status: "503 Service Unavailable"); return "503 Service Unavailable" }
         let deadline = DispatchWorkItem { [weak self, weak child] in
             guard let self, let child, self.process === child else { return }
             if child.isRunning { child.terminate() }
@@ -46,13 +47,39 @@ private final class WidgetRefresher {
         }
         timeout = deadline
         queue.asyncAfter(deadline: .now() + 45, execute: deadline)
+        return "202 Accepted"
     }
 
     private func finish(_ child: Process, status: String) {
         guard process === child else { return }
         timeout?.cancel(); timeout = nil; process = nil
-        let callbacks = waiting; waiting = []
-        callbacks.forEach { $0(status) }
+        startedAt = nil
+        failedAt = status == "200 OK" ? nil : Date()
+        // The worker may reload before its process exits. Reload again after
+        // clearing the busy state so the activity indicator always stops.
+        let helper = Process(), input = Pipe()
+        helper.executableURL = resources.appendingPathComponent("CampusWidgetSnapshot")
+        helper.standardInput = input
+        helper.standardOutput = FileHandle.nullDevice; helper.standardError = FileHandle.nullDevice
+        do {
+            try helper.run()
+            input.fileHandleForWriting.write(Data("{\"action\":\"reload\"}".utf8))
+            try input.fileHandleForWriting.close()
+        } catch { /* The timeline also contains a deadline entry as a fallback. */ }
+    }
+    func snapshot(at path: URL) -> Data? {
+        let saved = (try? Data(contentsOf: path)).flatMap { $0.count <= 4096 ? $0 : nil }
+        var snapshot = saved.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String:Any] }
+        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime,.withFractionalSeconds]
+        if snapshot == nil, startedAt != nil {
+            let empty: [String:Any] = ["value":NSNull(),"note":"暂不可用","updatedAt":NSNull()]
+            snapshot = ["updatedAt":formatter.string(from:Date()),"card":empty,"network":empty,"lighting":empty,"air":empty]
+        }
+        guard var value = snapshot else { return nil }
+        if let startedAt { value["refreshStartedAt"] = formatter.string(from:startedAt) }
+        if let failedAt, let timestamp = value["updatedAt"] as? String,
+           let updatedAt = formatter.date(from:timestamp), updatedAt <= failedAt { value["refreshFailed"] = true }
+        return try? JSONSerialization.data(withJSONObject:value)
     }
 }
 
@@ -112,9 +139,9 @@ private final class WidgetRefresher {
                 respond(connection, status: "404 Not Found"); return
             }
             if request[0] == "POST", request[1] == "/refresh" {
-                refresher.refresh { status in respond(connection, status: status) }
+                respond(connection, status: refresher.refresh())
             } else if request[0] == "GET", request[1] == "/snapshot" {
-                let body = (try? Data(contentsOf: path)).flatMap { $0.count <= 4096 ? $0 : nil }
+                let body = refresher.snapshot(at: path)
                 respond(connection, status: body == nil ? "404 Not Found" : "200 OK", body: body ?? Data())
             } else { respond(connection, status: "404 Not Found") }
         }

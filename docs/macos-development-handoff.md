@@ -266,7 +266,7 @@ open ../校园余额-v1.1.4.app
 
 ### 6.5 小组件与后台刷新
 
-- 小组件是独立沙盒 appex（`com.apple.security.app-sandbox` + `network.client`），**拿不到** App 的钥匙串和学校 cookie，通过本机 bridge 读快照或请求刷新。右上角的 `RefreshBalanceIntent` 使用带 token 的 `POST /refresh`；bridge 启动同资源目录下的 `CampusWidgetRefresh` 并设置 `CAMPUS_WIDGET_HELPER`。重复请求合并为同一工作进程，等待完成后响应，45 秒超时终止；不阻塞快照读取。失败保留旧余额并记入诊断日志，学校要求验证码时仍需在 App 中验证。
+- 小组件是独立沙盒 appex（`com.apple.security.app-sandbox` + `network.client`），**拿不到** App 的钥匙串和学校 cookie，通过本机 bridge 读快照或请求刷新。右上角的 `RefreshBalanceIntent` 使用带 token 的 `POST /refresh`；bridge 启动同资源目录下的 `CampusWidgetRefresh` 并设置 `CAMPUS_WIDGET_HELPER`。重复请求合并为同一工作进程，启动后立即返回 202，45 秒超时终止；不阻塞其它小组件操作和快照读取。快照响应附带临时的 `refreshStartedAt` / `refreshFailed`；小组件用系统时间进度环显示活动状态，并预置 46 秒过期的 timeline entry，防止后台崩溃后一直显示忙碌。bridge 在清除活动状态后通过 snapshot helper 的 `reload` 动作再次重载 timeline；该动作不修改余额文件。失败保留旧余额并记入诊断日志，学校要求验证码时仍需在 App 中验证。
 - `CampusWidgetBridge`（常驻 KeepAlive）监听 `127.0.0.1:49771`，校验 `Authorization: Bearer <appex Info.plist 中的 CampusWidgetToken>`；快照 ≤4096 字节。
 - `CampusWidgetRefresh`（每天 08:30 + RunAtLoad）从 `widget-account.json` + 钥匙串登录，`dashboard.refresh(balanceOnly:true)`，再通过 `CampusWidgetSnapshot` 写快照并 `WidgetCenter.reloadTimelines`。
 - 新旧快照合并：本次某项 `value == null` 时保留上次成功值，备注标为「更新失败」（`SnapshotMerge.swift`）。
