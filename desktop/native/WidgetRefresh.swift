@@ -13,6 +13,10 @@ import Foundation
             let dashboard = NativeDashboard(client:client,current:current,autoLogin:false)
             let snapshot = await dashboard.refresh(balanceOnly:true)
             try WidgetSnapshots.publish(snapshot)
-        } catch { exit(1) }
+        } catch {
+            _ = CampusDiagnostics.report(error, stage: .autoLogin)
+            try? WidgetSnapshots.publishFailure()
+            exit(1)
+        }
     }
 }

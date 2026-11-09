@@ -12,6 +12,11 @@ enum WidgetSnapshots {
         guard process.terminationStatus == 0 else { throw CampusHistoryError.invalid }
     }
     static func clear() throws { try send(["action":"clear"]) }
+    static func publishFailure() throws {
+        let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime,.withFractionalSeconds]
+        let unavailable: [String:Any] = ["value":NSNull(),"note":"更新失败","updatedAt":NSNull()]
+        try send(["updatedAt":formatter.string(from:Date()),"card":unavailable,"network":unavailable,"lighting":unavailable,"air":unavailable])
+    }
     static func publish(_ snapshot: NativeDashboardSnapshot, now: Date = Date()) throws {
         let f = ISO8601DateFormatter(); f.formatOptions = [.withInternetDateTime,.withFractionalSeconds]
         let timestamp = f.string(from:now)

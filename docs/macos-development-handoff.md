@@ -42,7 +42,7 @@
 │        ▼                                                                     │
 │  学校服务（cc-pay / zfw / mall / shsd / sso）——只在 CampusServer 里访问       │
 │                                                                             │
-│  Contents/PlugIns/CampusBalanceWidget.appex ← SwiftUI 小组件（只读快照）      │
+│  Contents/PlugIns/CampusBalanceWidget.appex ← SwiftUI 小组件（快照 + 刷新请求）      │
 │  后台：LaunchAgent CampusWidgetBridge（常驻）+ CampusWidgetRefresh（每天 8:30）│
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -100,8 +100,8 @@ VERSION                   版本号唯一来源，如 1.1.4
 | `RefreshBatches.swift` | 同一次刷新 4 个分片都到齐才发布小组件快照，避免旧批次覆盖 |
 | `WidgetSnapshots.swift` | 调 `CampusWidgetSnapshot` 写快照文件 |
 | `WidgetAgents.swift` | 安装/校验/卸载两个 LaunchAgent（bridge 常驻 + 每天 8:30 刷新） |
-| `WidgetRefresh.swift` | 每日后台刷新入口（从钥匙串取密码，balanceOnly 刷新） |
-| `WidgetBridge.swift` | 小组件只读桥：`127.0.0.1:49771/snapshot`，Bearer token 校验 |
+| `WidgetRefresh.swift` | 定时/手动后台刷新入口（从钥匙串取密码，balanceOnly 刷新） |
+| `WidgetBridge.swift` | 小组件桥：`GET /snapshot` 读快照，`POST /refresh` 运行后台刷新；仅监听 `127.0.0.1:49771` 并校验 Bearer token、Host 和无 Origin |
 
 ---
 
@@ -266,7 +266,7 @@ open ../校园余额-v1.1.4.app
 
 ### 6.5 小组件与后台刷新
 
-- 小组件是独立沙盒 appex（`com.apple.security.app-sandbox` + `network.client`），**拿不到** App 的钥匙串和学校 cookie，只能通过本机 bridge 读快照。
+- 小组件是独立沙盒 appex（`com.apple.security.app-sandbox` + `network.client`），**拿不到** App 的钥匙串和学校 cookie，通过本机 bridge 读快照或请求刷新。右上角的 `RefreshBalanceIntent` 使用带 token 的 `POST /refresh`；bridge 启动同资源目录下的 `CampusWidgetRefresh` 并设置 `CAMPUS_WIDGET_HELPER`。重复请求合并为同一工作进程，等待完成后响应，45 秒超时终止；不阻塞快照读取。失败保留旧余额并记入诊断日志，学校要求验证码时仍需在 App 中验证。
 - `CampusWidgetBridge`（常驻 KeepAlive）监听 `127.0.0.1:49771`，校验 `Authorization: Bearer <appex Info.plist 中的 CampusWidgetToken>`；快照 ≤4096 字节。
 - `CampusWidgetRefresh`（每天 08:30 + RunAtLoad）从 `widget-account.json` + 钥匙串登录，`dashboard.refresh(balanceOnly:true)`，再通过 `CampusWidgetSnapshot` 写快照并 `WidgetCenter.reloadTimelines`。
 - 新旧快照合并：本次某项 `value == null` 时保留上次成功值，备注标为「更新失败」（`SnapshotMerge.swift`）。
@@ -345,7 +345,7 @@ npm test
 ```
 
 - `npm test` 覆盖：会话 cookie 封装、设置校验、数据组装、诊断日志脱敏、流水分页、小组件 agent/bridge/refresh/snapshot。
-- `tests/run-native.sh` 用合成响应断言：消费分页与充值不计入、流量分页与单位、重定向白名单、登录表单/流量表/明细解析、电费 CSV 与表号匹配、设置读写与账号隔离、LaunchAgent 复用判断；随后编译 `WidgetBridge` 并用 `CAMPUS_NATIVE_BRIDGE=<二进制> node --test tests/widget-bridge.test.js` 测 token/越权。
+- `tests/run-native.sh` 用合成响应断言：消费分页与充值不计入、流量分页与单位、重定向白名单、登录表单/流量表/明细解析、电费 CSV 与表号匹配、设置读写与账号隔离、LaunchAgent 复用判断；随后编译 `WidgetBridge` 并用 `CAMPUS_NATIVE_BRIDGE=<二进制> node --test tests/widget-bridge.test.js` 测 token/越权，以及手动刷新认证、请求合并、并行读取快照、失败保留数据和失败后恢复。
 - 新增解析逻辑时：Swift 侧在 `tests/native/main.swift` 加 `check(...)`；JS 侧在 `tests/*.test.js` 加 `test(...)`。
 
 调试用的编译开关：`CAMPUS_TESTING`（`SchoolHTTP`/`SchoolClient` 导出 cookie 帮助测试）、`CAMPUS_ISOLATED_TEST`（`NativeServer` 禁止自动登录/跳过快照发布）。发版构建不定义它们。

@@ -79,6 +79,27 @@ private enum WidgetStorage {
             completion(decode(data))
         }.resume()
     }
+    static func refresh() async throws {
+        guard let token = Bundle.main.object(forInfoDictionaryKey: "CampusWidgetToken") as? String,
+              let url = URL(string: "http://127.0.0.1:49771/refresh") else { throw WidgetIntentError.refreshUnavailable }
+        var request = URLRequest(url: url, timeoutInterval: 50)
+        request.httpMethod = "POST"
+        request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization")
+        let (_, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode
+        if status == 409 { throw WidgetIntentError.autoLoginRequired }
+        guard status == 200 else { throw WidgetIntentError.refreshUnavailable }
+    }
+}
+
+struct RefreshBalanceIntent: AppIntent {
+    static var title: LocalizedStringResource = "刷新余额"
+    static var openAppWhenRun: Bool = false
+
+    func perform() async throws -> some IntentResult {
+        try await WidgetStorage.refresh()
+        return .result()
+    }
 }
 
 struct SelectBalanceIntent: AppIntent {
@@ -98,8 +119,14 @@ struct SelectBalanceIntent: AppIntent {
 }
 
 private enum WidgetIntentError: LocalizedError {
-    case storageUnavailable
-    var errorDescription: String? { "小组件无法访问共享数据" }
+    case storageUnavailable, autoLoginRequired, refreshUnavailable
+    var errorDescription: String? {
+        switch self {
+        case .storageUnavailable: return "小组件无法访问共享数据"
+        case .autoLoginRequired: return "请先在 App 中开启自动重新登录"
+        case .refreshUnavailable: return "刷新失败，请打开 App 检查登录状态后重试"
+        }
+    }
 }
 
 struct BalanceEntry: TimelineEntry {
@@ -150,7 +177,14 @@ struct BalanceWidgetView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(metric.title).font(.system(size: 12, weight: .medium)).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.75)
+            HStack(spacing: 2) {
+                Text(metric.title).font(.system(size: 12, weight: .medium)).foregroundStyle(muted).lineLimit(1).minimumScaleFactor(0.75)
+                Spacer(minLength: 0)
+                Button(intent: RefreshBalanceIntent()) {
+                    Image(systemName: "arrow.clockwise").font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(muted).frame(width: 24, height: 24).contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityLabel("刷新余额")
+            }.frame(height: 16)
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(balance?.value.map { $0.formatted(.number.precision(.fractionLength(metric == .network ? 1 : 2))) } ?? "—")
                     .font(.system(size: 38, weight: .bold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.5)
