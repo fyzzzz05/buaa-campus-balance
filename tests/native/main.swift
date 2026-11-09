@@ -110,13 +110,18 @@ check(LocalSettings.read(user:"testuser",home:tempHome) == settings, "settings r
 check(LocalSettings.read(user:"other",home:tempHome) != settings, "account isolation")
 do { try DormSettings(dorm:"", lighting:"../../bad", air:"", historyOwner:"").validate(); fatalError("invalid meter accepted") } catch {}
 print("Native settings tests passed")
-let resource = URL(fileURLWithPath:"/tmp/widget-resources")
+let resource = tempHome.appendingPathComponent("widget-resources")
+try FileManager.default.createDirectory(at:resource,withIntermediateDirectories:true)
+let tokenPath = resource.appendingPathComponent("widget-token")
+try Data(String(repeating:"a",count:64).utf8).write(to:tokenPath)
 let refresh: [String:Any] = ["ProgramArguments":[resource.appendingPathComponent("CampusWidgetRefresh").path],"EnvironmentVariables":["CAMPUS_WIDGET_HELPER":resource.appendingPathComponent("CampusWidgetSnapshot").path],"RunAtLoad":true,"StartCalendarInterval":["Hour":8,"Minute":30]]
 let bridge: [String:Any] = ["ProgramArguments":[resource.appendingPathComponent("CampusWidgetBridge").path,resource.appendingPathComponent("widget-token").path],"RunAtLoad":true,"KeepAlive":true]
-let jobConfig: [String:Any] = ["user":"testuser","networkSamePassword":true]
+let jobConfig: [String:Any] = ["user":"testuser","networkSamePassword":true,"widgetBuild":WidgetAgents.buildIdentity(resources:resource)!]
 check(WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"testuser",same:true,resources:resource), "reuse matching agents")
 check(!WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"other",same:true,resources:resource), "different account must not reuse")
 check(!WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"testuser",same:false,resources:resource), "different network policy must not reuse")
+try Data(String(repeating:"b",count:64).utf8).write(to:tokenPath)
+check(!WidgetAgents.matches(configValue:jobConfig,refresh:refresh,bridge:bridge,user:"testuser",same:true,resources:resource), "in-place app update must restart agents for the new widget token")
 print("Native agent reuse tests passed")
 var batches = RefreshBatches()
 let good: [String:Any] = ["status":"ok","value":42.0]

@@ -17,7 +17,7 @@
 | 进程模型 | `CampusBalance`（GUI）→ 子进程 `CampusServer`（数据/接口）→ 学校服务 |
 | 数据库 | 无。JSON 文件 + macOS 钥匙串 |
 | 构建 | `./desktop/build.sh`（无小组件）/ `./desktop/widget/build-with-widget.sh`（完整发布形态） |
-| 发布 | GitHub Actions 打 tag `vX.Y.Z` → 只上传 **DMG**，无 ZIP / 无 appcast |
+| 发布 | GitHub Actions 打 tag `vX.Y.Z` → 上传 **DMG + 签名 appcast.xml**，无 ZIP / delta |
 | 签名 | 仅 ad-hoc（`codesign --sign -`），**未公证**，首次打开会被 Gatekeeper 拦 |
 | 系统要求 | Apple 芯片 Mac，macOS 13.5+（小组件要 macOS 14+） |
 | 测试 | `npm test`（JS）+ `./tests/run-native.sh`（Swift） |
@@ -367,13 +367,15 @@ npm test
 2. `APP_VERSION=<tag 去掉 v> ./desktop/widget/build-with-widget.sh "$RUNNER_TEMP/校园余额-v$VERSION.app"`
 3. `codesign --verify --deep --strict`，断言 appex 内有 `Metadata.appintents`
 4. `hdiutil create ... -format UDZO` 生成 `CampusBalance-vX.Y.Z-macOS-arm64.dmg`（附 `/Applications` 软链）
-5. `gh release create <tag> --draft`（有 `docs/releases/<tag>.md` 就用它，否则 `--generate-notes`）→ 只上传 DMG → `gh release edit --draft=false --latest`
+5. `sh tests/run-update.sh <构建的 app 路径>` 用临时密钥验证签名、错误公钥拒绝和篡改拒绝；生产 DMG 与 appcast 使用仓库 Secret 签名并验证。
+6. `gh release create <tag> --draft`（有 `docs/releases/<tag>.md` 就用它，否则 `--generate-notes`）→ 上传 DMG 和签名 appcast.xml → `gh release edit --draft=false --latest`
 
 发布纪律（来自 `AGENTS.md`，务必遵守）：
 
-- **只上传 DMG**，不上传 ZIP、appcast 或其它附件。
+- 上传 **DMG + 签名 appcast.xml**，不生成 ZIP 或 delta。DMG 保持为唯一安装包。
 - 发布前核实 GitHub Releases 的实际状态；`VERSION` 文件不代表已经发布。
-- 不要宣称支持 Sparkle 自动更新：`Info.plist` 里虽然有 `SUFeedURL`/`SUPublicEDKey`，构建也嵌入了 `Sparkle.framework`，但 `main.swift` 只有 `import Sparkle`，**没有启动 updater**，菜单「下载更新…」只是打开 Releases 页面。
+- `main.swift` 启动 `SPUStandardUpdaterController`，菜单「检查更新…」交给 Sparkle 处理检查、下载、安装及重启；定期检查开启，静默下载安装关闭。旧版本（截至 1.1.7）仍需手动安装一次。
+- 仓库 Secret `SPARKLE_PRIVATE_KEY` 必须与应用内的 `SUPublicEDKey` 配对；缺失时在构建前失败。`generate_appcast` 签名 DMG 和 feed，`sign_update --verify` 校验 feed，`desktop/verify-update.swift` 使用构建产物中的公钥验证 DMG，同时检查版本、下载地址和长度。验证完成后才创建 Release。私钥仅经 stdin 传入 Sparkle 工具，不写日志或附件。
 - 应用图标以 `desktop/assets/campus-balance-icon.svg` 为源，构建时生成 `.icns`；不要直接改 `.icns`。
 
 ### 9.3 发布后自检
@@ -439,7 +441,7 @@ spctl -a -vv "校园余额-v1.1.4.app"   # 预期被拒（未公证），属已�
 
 ## 13. 交接待办 / 已知现状
 
-- Sparkle 自动更新**未启用**（只嵌入了 framework 与 Info.plist 配置）；如果以后恢复自动更新，需要同时产出 appcast 并改发布流程（当前与 `AGENTS.md` 的 DMG-only 要求冲突，需先确认）。
+- Sparkle 应用内更新已接通，发布链路需同时提供签名 DMG 与 appcast。尚未发布的本地代码不代表线上 feed 可用；发版后需要验证真实旧版 → 新版安装及重启。
 - 代码里仍保留网页模式（Vercel）+ Node 一套 `api/`、`lib/`，与本机 App 并行维护；新增接口容易漏掉一边（§3）。
 - 小组件后台任务依赖 `~/Library/LaunchAgents`，没有集中诊断入口；组件问题优先看 `log show --last 10m --predicate 'subsystem == "edu.buaa.campusbalance"'`。
 - 未做 Apple Developer ID 签名与公证；如要正式分发，需要先补签名/公证与发布流程。

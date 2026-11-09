@@ -20,6 +20,10 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: ./tests/run-native.sh
+      - name: Require update signing key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: test -n "$SPARKLE_PRIVATE_KEY"
       - name: Build app
         shell: bash
         run: |
@@ -33,10 +37,23 @@ jobs:
           iconutil -c iconset "$APP/Contents/Resources/AppIcon.icns" -o "$RUNNER_TEMP/verified-app.iconset"
           test -s "$RUNNER_TEMP/verified-app.iconset/icon_512x512@2x.png"
           test -d "$RUNNER_TEMP/校园余额-v$VERSION.app/Contents/PlugIns/CampusBalanceWidget.appex/Contents/Resources/Metadata.appintents"
-          mkdir "$RUNNER_TEMP/dmg-content"
+          mkdir "$RUNNER_TEMP/dmg-content" "$RUNNER_TEMP/updates"
           cp -R "$RUNNER_TEMP/校园余额-v$VERSION.app" "$RUNNER_TEMP/dmg-content/"
           ln -s /Applications "$RUNNER_TEMP/dmg-content/Applications"
-          hdiutil create -volname "校园余额 v$VERSION" -srcfolder "$RUNNER_TEMP/dmg-content" -format UDZO "$RUNNER_TEMP/CampusBalance-v$VERSION-macOS-arm64.dmg"
+          hdiutil create -volname "校园余额 v$VERSION" -srcfolder "$RUNNER_TEMP/dmg-content" -format UDZO "$RUNNER_TEMP/updates/CampusBalance-v$VERSION-macOS-arm64.dmg"
+      - name: Test update signatures and tamper rejection
+        run: sh tests/run-update.sh "$RUNNER_TEMP/校园余额-v${GITHUB_REF_NAME#v}.app"
+      - name: Sign and verify update feed
+        shell: bash
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          SPARKLE_DIR="$(sh desktop/prepare-sparkle.sh)"
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_DIR/bin/generate_appcast" --ed-key-file - --maximum-deltas 0 --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/" "$RUNNER_TEMP/updates"
+          printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_DIR/bin/sign_update" --ed-key-file - --verify "$RUNNER_TEMP/updates/appcast.xml"
+          swift desktop/verify-update.swift "$RUNNER_TEMP/校园余额-v$VERSION.app/Contents/Info.plist" "$RUNNER_TEMP/updates/appcast.xml" "$RUNNER_TEMP/updates/CampusBalance-v$VERSION-macOS-arm64.dmg" "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/"
       - name: Publish release
         shell: bash
         env:
@@ -48,5 +65,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --draft --title "校园余额 ${GITHUB_REF_NAME}" --generate-notes
           fi
-          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg"
+          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/updates/CampusBalance-v${GITHUB_REF_NAME#v}-macOS-arm64.dmg" "$RUNNER_TEMP/updates/appcast.xml"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

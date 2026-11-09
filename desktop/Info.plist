@@ -15,6 +15,9 @@
   <key>SUPublicEDKey</key><string>OKchFlDeTFqdUmZIaui8iejfYqK9cgEoN9HgJPaPOfM=</string>
   <key>SUVerifyUpdateBeforeExtraction</key><true/>
   <key>SURequireSignedFeed</key><true/>
+  <key>SUEnableAutomaticChecks</key><true/>
+  <key>SUAutomaticallyUpdate</key><false/>
+  <key>SUAllowsAutomaticUpdates</key><false/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key><dict>
     <key>NSAllowsLocalNetworking</key><true/>

@@ -14,8 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     private var schoolLogin = false
     private var completingSchoolLogin = false
     private var pendingMetric: String?
+    private var updaterController: SPUStandardUpdaterController!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
         configureMenu()
         let rect = NSRect(x: 0, y: 0, width: 1050, height: 720)
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -42,8 +44,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         mainMenu.addItem(appItem)
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "关于校园余额", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
-        let updateItem = NSMenuItem(title: "下载更新…", action: #selector(openReleases(_:)), keyEquivalent: "")
-        updateItem.target = self
+        let updateItem = NSMenuItem(title: "检查更新…", action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)), keyEquivalent: "")
+        updateItem.target = updaterController
         appMenu.addItem(updateItem)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "隐藏校园余额", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
@@ -83,10 +85,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         mainMenu.addItem(withTitle: "帮助", action: nil, keyEquivalent: "").submenu = helpMenu
         NSApp.helpMenu = helpMenu
         NSApp.mainMenu = mainMenu
-    }
-
-    @objc private func openReleases(_ sender: Any?) {
-        NSWorkspace.shared.open(URL(string: "https://github.com/fyzzzz05/buaa-campus-balance/releases/latest")!)
     }
 
     @objc private func openDiagnostics(_ sender: Any?) {

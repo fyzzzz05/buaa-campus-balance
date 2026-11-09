@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 enum WidgetAgents {
     private static let label = "edu.buaa.campusbalance.widget-refresh"
@@ -18,9 +19,16 @@ enum WidgetAgents {
         try FileManager.default.createDirectory(at:url.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
         try data.write(to:url,options:.atomic);try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:url.path)
     }
+    static func buildIdentity(resources:URL) -> String? {
+        guard let token=try? Data(contentsOf:resources.appendingPathComponent("widget-token")), !token.isEmpty else { return nil }
+        return SHA256.hash(data:token).map { String(format:"%02x",$0) }.joined()
+    }
     // Reuse a registered job only when identity, password policy, executable
     // paths and schedule all match. Otherwise the caller clears and replaces it.
     static func matches(configValue:[String:Any], refresh:[String:Any], bridge:[String:Any], user:String, same:Bool, resources:URL) -> Bool {
+        // Sparkle replaces the bundle at the same path. A new token requires
+        // restarting the bridge even when all executable paths still match.
+        guard let identity=buildIdentity(resources:resources), configValue["widgetBuild"] as? String == identity else { return false }
         let expectedRefresh=resources.appendingPathComponent("CampusWidgetRefresh").path
         let expectedBridge=resources.appendingPathComponent("CampusWidgetBridge").path
         let expectedHelper=resources.appendingPathComponent("CampusWidgetSnapshot").path
@@ -63,9 +71,10 @@ enum WidgetAgents {
         let helper=resources.appendingPathComponent("CampusWidgetSnapshot").path
         let token=resources.appendingPathComponent("widget-token").path
         guard [refresh,bridge,helper,token].allSatisfy({FileManager.default.fileExists(atPath:$0)}) else { throw CampusHistoryError.invalid }
+        guard let identity=buildIdentity(resources:resources) else { throw CampusHistoryError.invalid }
         try disable()
         try FileManager.default.createDirectory(at:config.deletingLastPathComponent(),withIntermediateDirectories:true,attributes:[.posixPermissions:0o700])
-        try JSONSerialization.data(withJSONObject:["user":user,"networkSamePassword":networkSamePassword]).write(to:config,options:.atomic)
+        try JSONSerialization.data(withJSONObject:["user":user,"networkSamePassword":networkSamePassword,"widgetBuild":identity]).write(to:config,options:.atomic)
         try FileManager.default.setAttributes([.posixPermissions:0o600],ofItemAtPath:config.path)
         try write(["Label":bridgeLabel,"ProgramArguments":[bridge,token],"RunAtLoad":true,"KeepAlive":true],to:plist(bridgeLabel))
         try write(["Label":label,"ProgramArguments":[refresh],"EnvironmentVariables":["CAMPUS_WIDGET_HELPER":helper],"RunAtLoad":true,"StartCalendarInterval":["Hour":8,"Minute":30]],to:plist(label))
